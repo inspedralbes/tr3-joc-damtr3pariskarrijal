@@ -1,6 +1,7 @@
 services:
   mysql:
     image: mysql:8.0
+    container_name: mysql_db
     environment:
       MYSQL_ROOT_PASSWORD: root
       MYSQL_DATABASE: tankstars
@@ -8,9 +9,14 @@ services:
       - "3306:3306"
     volumes:
       - ./server/api/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
   api:
     build: ./server/api
+    container_name: api_service
     ports:
       - "3001:3001"
     environment:
@@ -18,16 +24,22 @@ services:
       DB_USER: root
       DB_PASSWORD: root
       DB_NAME: tankstars
+      JWT_SECRET: tankstars_secret_key
     depends_on:
-      - mysql
+      mysql:
+        condition: service_healthy
 
   game:
     build: ./server/game
+    container_name: game_service
     ports:
       - "3002:3002"
+    depends_on:
+      - api
 
   nginx:
     image: nginx:alpine
+    container_name: nginx_proxy
     ports:
       - "80:80"
     volumes:
