@@ -13,6 +13,11 @@ services:
     build: ./server/api
     ports:
       - "3001:3001"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: tankstars
     depends_on:
       - mysql
 
