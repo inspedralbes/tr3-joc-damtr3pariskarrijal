@@ -12,6 +12,14 @@
             <ui:Label text="🎯 TANK STARS" class="title"/>
             <ui:Label name="welcome-text" text="Welcome, Player!" class="subtitle"/>
 
+            <ui:Label text="Map Theme" class="input-label"/>
+            <ui:VisualElement class="map-picker">
+                <ui:Button name="map-prev-btn" class="map-select-btn" text="◀"/>
+                <ui:Label name="selected-map-label" text="Desert" class="map-pill"/>
+                <ui:Button name="map-next-btn" class="map-select-btn" text="▶"/>
+            </ui:VisualElement>
+            <ui:Label name="map-description-label" text="Warm dunes with rolling cover and smooth craters." class="helper-text"/>
+
             <ui:Button name="create-btn" class="btn-primary" text="🆕  CREATE GAME"/>
 
             <ui:VisualElement class="divider"/>

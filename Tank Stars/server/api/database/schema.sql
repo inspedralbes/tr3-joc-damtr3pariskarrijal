@@ -15,6 +15,7 @@ CREATE TABLE games (
   room_code VARCHAR(10) NOT NULL UNIQUE,
   player1_id INT,
   player2_id INT,
+  map_type VARCHAR(20) NOT NULL DEFAULT 'desert',
   status ENUM('waiting', 'in_progress', 'finished') DEFAULT 'waiting',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (player1_id) REFERENCES users(id),

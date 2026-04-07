@@ -192,6 +192,48 @@
     background-color: rgb(70, 120, 255);
 }
 
+.map-picker {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 6px;
+    gap: 8px;
+}
+
+.map-select-btn {
+    width: 18%;
+    min-width: 44px;
+    height: 36px;
+    background-color: rgb(44, 60, 108);
+    border-radius: 8px;
+    border-width: 0;
+    color: rgb(255, 255, 255);
+    font-size: 12px;
+    -unity-font-style: bold;
+}
+
+.map-pill {
+    flex-grow: 1;
+    height: 36px;
+    background-color: rgb(35, 45, 70);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgb(80, 100, 160);
+    color: rgb(240, 218, 120);
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    padding-top: 9px;
+}
+
+.helper-text {
+    color: rgb(150, 167, 206);
+    font-size: 11px;
+    -unity-text-align: middle-center;
+    margin-bottom: 8px;
+}
+
 .spinner {
     width: 40px;
     height: 40px;
@@ -213,41 +255,88 @@
 }
 
 .combat-root {
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 0;
+    padding-bottom: 0;
     justify-content: flex-start;
+    align-items: stretch;
     background-color: rgb(9, 13, 24);
 }
 
-.combat-shell {
+.battlefield-stage {
+    position: relative;
     width: 100%;
-    max-width: 980px;
+    height: 100%;
     flex-grow: 1;
-    margin-top: 6px;
-    margin-bottom: 6px;
+    background-color: rgb(22, 32, 52);
+    overflow: hidden;
 }
 
-.combat-header {
+.sky-haze {
+    position: absolute;
+    width: 36%;
+    height: 28%;
+    top: 8%;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.sky-haze-left {
+    left: -6%;
+}
+
+.sky-haze-right {
+    right: -8%;
+    top: 14%;
+    background-color: rgba(255, 226, 168, 0.08);
+}
+
+.combat-top-hud {
+    position: absolute;
+    left: 2%;
+    right: 2%;
+    top: 3%;
     flex-direction: row;
     justify-content: space-between;
-    gap: 10px;
-    margin-bottom: 10px;
+    align-items: flex-start;
+    gap: 14px;
+    z-index: 3;
 }
 
-.combat-panel {
-    flex-grow: 1;
-    background-color: rgb(20, 29, 50);
-    border-radius: 14px;
+.floating-panel {
+    background-color: rgba(12, 20, 38, 0.7);
+    border-radius: 18px;
     border-width: 1px;
-    border-color: rgb(60, 85, 140);
-    padding: 12px;
+    border-color: rgba(255, 255, 255, 0.12);
+    padding: 14px;
 }
 
-.compact-panel {
-    max-width: 240px;
+.hud-side-panel {
+    width: 23%;
+    min-width: 220px;
+    max-width: 300px;
+}
+
+.hud-center-panel {
+    flex-grow: 1;
+    min-width: 260px;
+    max-width: 520px;
+    align-items: center;
+    padding-top: 16px;
+    padding-bottom: 16px;
+}
+
+.combat-map-label {
+    color: rgb(132, 196, 255);
+    font-size: 15px;
+    margin-bottom: 4px;
+    -unity-text-align: middle-center;
 }
 
 .combat-title {
     margin-bottom: 4px;
-    font-size: 22px;
+    font-size: 24px;
 }
 
 .combat-section-title {
@@ -259,9 +348,10 @@
 
 .combat-turn-label {
     color: rgb(230, 236, 255);
-    font-size: 17px;
+    font-size: 18px;
     -unity-font-style: bold;
     margin-bottom: 4px;
+    -unity-text-align: middle-center;
 }
 
 .combat-note {
@@ -269,26 +359,12 @@
     font-size: 11px;
 }
 
-.battlefield-shell {
-    flex-direction: row;
-    gap: 10px;
-    margin-bottom: 10px;
-}
-
-.tank-card {
-    width: 21%;
-    background-color: rgb(24, 35, 59);
-    border-radius: 14px;
-    border-width: 1px;
-    padding: 12px;
-}
-
 .local-card {
-    border-color: rgb(67, 152, 255);
+    border-color: rgba(67, 152, 255, 0.45);
 }
 
 .enemy-card {
-    border-color: rgb(255, 134, 92);
+    border-color: rgba(255, 134, 92, 0.45);
 }
 
 .combat-card-title {
@@ -325,67 +401,97 @@
     background-color: rgb(255, 117, 87);
 }
 
-.battle-center {
-    flex-grow: 1;
-    min-height: 170px;
-    background-color: rgb(15, 22, 40);
-    border-radius: 16px;
-    border-width: 1px;
-    border-color: rgb(50, 70, 118);
-    padding: 12px;
-    justify-content: space-between;
+.terrain-strip {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    overflow: hidden;
 }
 
-.terrain-strip {
-    height: 78px;
-    margin-top: 8px;
-    margin-bottom: 10px;
-    border-radius: 14px;
-    background-color: rgb(54, 74, 54);
-    justify-content: flex-end;
-    padding-left: 12px;
-    padding-right: 12px;
-    padding-bottom: 8px;
+.terrain-fog {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 40%;
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.terrain-horizon {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 56%;
+    height: 1px;
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+.terrain-surface {
+    position: absolute;
+    left: 1.5%;
+    right: 1.5%;
+    top: 8%;
+    bottom: 0;
     flex-direction: row;
     align-items: flex-end;
+    padding-bottom: 0;
+}
+
+.terrain-column {
+    flex-grow: 1;
+    margin-left: 2px;
+    margin-right: 2px;
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
 }
 
 .tank-marker {
+    position: absolute;
     color: rgb(255, 255, 255);
-    background-color: rgb(31, 41, 67);
+    background-color: rgba(12, 20, 38, 0.82);
     border-radius: 999px;
-    padding-left: 8px;
-    padding-right: 8px;
-    padding-top: 4px;
-    padding-bottom: 4px;
-    font-size: 10px;
+    padding-left: 12px;
+    padding-right: 12px;
+    padding-top: 7px;
+    padding-bottom: 7px;
+    font-size: 12px;
     -unity-font-style: bold;
+    border-width: 1px;
 }
 
-.left-marker {
-    margin-right: auto;
+.local-marker {
+    border-color: rgba(90, 173, 255, 0.55);
 }
 
-.right-marker {
-    margin-left: auto;
+.enemy-marker {
+    border-color: rgba(255, 141, 108, 0.55);
 }
 
 .combat-log {
-    min-height: 42px;
+    min-height: 64px;
     color: rgb(219, 228, 255);
     font-size: 13px;
     white-space: normal;
 }
 
-.combat-controls {
+.combat-bottom-dock {
+    position: absolute;
+    left: 2%;
+    right: 2%;
+    bottom: 3%;
     flex-direction: row;
-    gap: 10px;
-    margin-bottom: 10px;
+    align-items: flex-end;
+    gap: 14px;
+    z-index: 3;
 }
 
 .control-panel {
-    min-height: 96px;
-    width: 49%;
+    width: 20%;
+    min-width: 200px;
+    max-width: 260px;
+    min-height: 118px;
 }
 
 .slider-value {
@@ -395,19 +501,28 @@
     margin-bottom: 4px;
 }
 
-.combat-actions {
-    flex-direction: row;
-    gap: 10px;
+.log-panel {
+    flex-grow: 1;
+    min-height: 118px;
+}
+
+.action-panel {
+    width: 20%;
+    min-width: 210px;
+    max-width: 260px;
 }
 
 .combat-fire-btn {
-    flex-grow: 1;
     margin-top: 0;
-    height: 42px;
+    height: 46px;
+    background-color: rgba(50, 100, 220, 0.82);
+    border-width: 1px;
+    border-color: rgba(130, 180, 255, 0.28);
 }
 
 .combat-leave-btn {
-    flex-grow: 1;
     margin-top: 0;
-    height: 42px;
+    height: 46px;
+    background-color: rgba(40, 50, 80, 0.76);
+    border-color: rgba(141, 164, 215, 0.24);
 }

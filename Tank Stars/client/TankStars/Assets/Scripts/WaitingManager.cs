@@ -9,6 +9,7 @@ public class WaitingManager : MonoBehaviour
     private string apiUrl = "http://localhost/api";
 
     private Label roomCodeText;
+    private Label mapTypeText;
     private Label player2Status;
     private Button backBtn;
 
@@ -33,6 +34,7 @@ public class WaitingManager : MonoBehaviour
         }
 
         roomCodeText  = root.Q<Label>("room-code-text");
+        mapTypeText   = root.Q<Label>("map-type-text");
         player2Status = root.Q<Label>("player2-status");
         backBtn       = root.Q<Button>("back-btn");
 
@@ -44,6 +46,10 @@ public class WaitingManager : MonoBehaviour
         }
 
         roomCodeText.text = gameManager.roomCode;
+        if (mapTypeText != null)
+        {
+            mapTypeText.text = "Map: " + FormatMapType(gameManager.mapType);
+        }
 
         backBtn.clicked += OnBackClick;
 
@@ -109,6 +115,16 @@ public class WaitingManager : MonoBehaviour
         StopAllCoroutines();
         GameManager.EnsureInstance().ResetMatchState();
         SceneManager.LoadScene("MenuScene");
+    }
+
+    private string FormatMapType(string mapType)
+    {
+        if (string.IsNullOrEmpty(mapType))
+        {
+            return "Desert";
+        }
+
+        return char.ToUpper(mapType[0]) + mapType.Substring(1);
     }
 }
 

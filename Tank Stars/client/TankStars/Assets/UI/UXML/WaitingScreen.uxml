@@ -16,6 +16,7 @@
                       class="subtitle" style="font-size:16px;"/>
 
             <ui:Label name="room-code-text" text="ABC123" class="room-code"/>
+            <ui:Label name="map-type-text" text="Map: Desert" class="helper-text"/>
 
             <ui:VisualElement class="divider"/>
 

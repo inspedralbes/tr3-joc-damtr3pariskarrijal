@@ -9,6 +9,7 @@ public class GameManager : MonoBehaviour
     public string username;
     public int gameId;
     public string roomCode;
+    public string mapType = "desert";
 
     public void ResetMatchState()
     {

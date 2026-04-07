@@ -5,9 +5,27 @@ const PORT = parseInt(process.env.PORT || '3002', 10);
 const MAX_HP = 100;
 const PLAYER1_X = 15;
 const PLAYER2_X = 85;
+const TERRAIN_RADIUS = 8;
+const MAP_TYPES = ['desert', 'snow', 'grassland', 'canyon', 'volcanic'];
+const MAP_PRESETS = {
+  desert: [34, 36, 39, 44, 49, 53, 56, 58, 57, 54, 48, 43, 39, 37, 36, 38, 43, 50, 58, 63, 66, 65, 61, 54],
+  snow: [52, 55, 60, 65, 69, 71, 68, 63, 57, 52, 50, 49, 51, 55, 61, 68, 74, 78, 76, 71, 64, 58, 54, 51],
+  grassland: [41, 43, 45, 48, 52, 55, 58, 56, 51, 46, 42, 40, 42, 46, 51, 57, 62, 64, 61, 56, 50, 46, 43, 41],
+  canyon: [46, 50, 55, 60, 62, 58, 49, 38, 28, 22, 20, 23, 31, 42, 55, 66, 72, 74, 69, 60, 52, 47, 45, 44],
+  volcanic: [39, 42, 46, 52, 60, 70, 78, 82, 74, 61, 48, 39, 35, 37, 45, 57, 68, 76, 73, 64, 53, 46, 41, 38],
+};
 
 const sessions = new Map();
 const wss = new WebSocketServer({ port: PORT });
+
+function normalizeMapType(mapType) {
+  const normalized = (mapType || 'desert').toLowerCase();
+  return MAP_TYPES.includes(normalized) ? normalized : 'desert';
+}
+
+function cloneTerrainHeights(mapType) {
+  return MAP_PRESETS[normalizeMapType(mapType)].slice();
+}
 
 function send(ws, payload) {
   if (ws && ws.readyState === 1) {
@@ -34,9 +52,16 @@ async function fetchGame(gameId) {
 }
 
 function createSession(game) {
+  const mapType = normalizeMapType(game.map_type);
   const session = {
     gameId: game.id,
     roomCode: game.room_code,
+    mapType,
+    terrainHeights: cloneTerrainHeights(mapType),
+    terrainEventId: 0,
+    lastImpactX: 0,
+    lastImpactY: 0,
+    lastImpactRadius: 0,
     player1Id: game.player1_id,
     player2Id: game.player2_id,
     player1Socket: null,
@@ -63,11 +88,16 @@ function createSession(game) {
 }
 
 function getOrCreateSession(game) {
+  const mapType = normalizeMapType(game.map_type);
   const existing = sessions.get(game.id);
   if (existing) {
     existing.roomCode = game.room_code;
     existing.player1Id = game.player1_id;
     existing.player2Id = game.player2_id;
+    existing.mapType = mapType;
+    if (!existing.terrainHeights || existing.terrainHeights.length === 0) {
+      existing.terrainHeights = cloneTerrainHeights(mapType);
+    }
     return existing;
   }
 
@@ -109,11 +139,7 @@ function detachPlayerSocket(ws) {
     session.player2Socket = null;
   }
 
-  if (
-    !session.player1Socket &&
-    !session.player2Socket &&
-    session.status === 'finished'
-  ) {
+  if (!session.player1Socket && !session.player2Socket && session.status === 'finished') {
     sessions.delete(session.gameId);
   }
 }
@@ -123,6 +149,9 @@ function buildStatePayload(type, session) {
     type,
     gameId: session.gameId,
     roomCode: session.roomCode,
+    mapType: session.mapType,
+    terrainHeights: session.terrainHeights,
+    terrainEventId: session.terrainEventId,
     player1Id: session.player1Id,
     player2Id: session.player2Id,
     player1Hp: session.player1Hp,
@@ -138,12 +167,24 @@ function buildStatePayload(type, session) {
     lastAttackerPlayerId: session.lastAttackerPlayerId,
     lastAngle: session.lastAngle,
     lastPower: session.lastPower,
+    lastImpactX: session.lastImpactX,
+    lastImpactY: session.lastImpactY,
+    lastImpactRadius: session.lastImpactRadius,
     durationSeconds: session.startedAt
-      ? Math.max(
-          0,
-          Math.floor(((session.finishedAt || Date.now()) - session.startedAt) / 1000)
-        )
+      ? Math.max(0, Math.floor(((session.finishedAt || Date.now()) - session.startedAt) / 1000))
       : 0,
+  };
+}
+
+function buildTerrainDestroyedPayload(session) {
+  return {
+    type: 'terrain_destroyed',
+    gameId: session.gameId,
+    mapType: session.mapType,
+    impactX: session.lastImpactX,
+    impactY: session.lastImpactY,
+    radius: session.lastImpactRadius,
+    terrainEventId: session.terrainEventId,
   };
 }
 
@@ -154,6 +195,7 @@ function startSessionIfReady(session) {
       type: 'joined_waiting',
       gameId: session.gameId,
       roomCode: session.roomCode,
+      mapType: session.mapType,
       message: 'Waiting for the other player to connect to combat.',
     });
     return;
@@ -187,6 +229,46 @@ function getTargetInfo(session, attackerPlayerId) {
   };
 }
 
+function getColumnX(index, totalColumns) {
+  if (totalColumns <= 1) {
+    return 0;
+  }
+
+  return (index / (totalColumns - 1)) * 100;
+}
+
+function getTerrainHeightAtX(terrainHeights, impactX) {
+  if (!Array.isArray(terrainHeights) || terrainHeights.length === 0) {
+    return 25;
+  }
+
+  let bestIndex = 0;
+  let smallestDelta = Infinity;
+  for (let index = 0; index < terrainHeights.length; index += 1) {
+    const delta = Math.abs(getColumnX(index, terrainHeights.length) - impactX);
+    if (delta < smallestDelta) {
+      smallestDelta = delta;
+      bestIndex = index;
+    }
+  }
+
+  return terrainHeights[bestIndex];
+}
+
+function applyCrater(terrainHeights, impactX, impactY, radius) {
+  for (let index = 0; index < terrainHeights.length; index += 1) {
+    const columnX = getColumnX(index, terrainHeights.length);
+    const deltaX = Math.abs(columnX - impactX);
+    if (deltaX > radius) {
+      continue;
+    }
+
+    const depthFactor = 1 - (deltaX / radius);
+    const carvedHeight = Math.round(impactY - (radius * 1.6 * depthFactor));
+    terrainHeights[index] = Math.max(6, Math.min(terrainHeights[index], carvedHeight));
+  }
+}
+
 function calculateShot(session, attackerPlayerId, angle, power) {
   const { attackerX, targetX, targetKey, direction } = getTargetInfo(
     session,
@@ -215,6 +297,14 @@ function calculateShot(session, attackerPlayerId, angle, power) {
   session.lastAttackerPlayerId = attackerPlayerId;
   session.lastAngle = angle;
   session.lastPower = power;
+
+  const impactX = Number(Math.max(0, Math.min(100, landingX)).toFixed(2));
+  const impactY = getTerrainHeightAtX(session.terrainHeights, impactX);
+  session.lastImpactX = impactX;
+  session.lastImpactY = impactY;
+  session.lastImpactRadius = TERRAIN_RADIUS;
+  session.terrainEventId += 1;
+  applyCrater(session.terrainHeights, impactX, impactY, TERRAIN_RADIUS);
 
   return {
     result,
@@ -249,6 +339,11 @@ function handleFireShot(ws, payload) {
     return;
   }
 
+  if (!MAP_TYPES.includes(session.mapType)) {
+    sendError(ws, 'Game map is invalid.');
+    return;
+  }
+
   if (!Number.isFinite(angle) || angle < 0 || angle > 90) {
     sendError(ws, 'Angle must be between 0 and 90.');
     return;
@@ -260,10 +355,9 @@ function handleFireShot(ws, payload) {
   }
 
   calculateShot(session, playerId, angle, power);
+  broadcast(session, buildTerrainDestroyedPayload(session));
 
-  const targetIsDefeated =
-    session.player1Hp <= 0 || session.player2Hp <= 0;
-
+  const targetIsDefeated = session.player1Hp <= 0 || session.player2Hp <= 0;
   if (targetIsDefeated) {
     session.status = 'finished';
     session.finishedAt = Date.now();
@@ -307,6 +401,11 @@ async function handleJoinGame(ws, payload) {
     }
 
     const session = getOrCreateSession(game);
+    if (!MAP_TYPES.includes(session.mapType)) {
+      sendError(ws, 'Selected map type is invalid.');
+      return;
+    }
+
     attachPlayerSocket(session, playerId, ws);
     startSessionIfReady(session);
   } catch (error) {
