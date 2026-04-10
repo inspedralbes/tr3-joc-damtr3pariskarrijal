@@ -1,0 +1,55 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <ui:Style src="../USS/CombatStyles.uss"/>
+
+    <ui:VisualElement name="root" class="combat-root">
+
+        <!-- Barra superior -->
+        <ui:VisualElement class="top-bar">
+            <ui:Label name="turn-label" text="Esperant..." class="turn-label"/>
+        </ui:VisualElement>
+
+        <!-- Barres de vida -->
+        <ui:VisualElement class="hp-row">
+            <ui:VisualElement class="hp-panel">
+                <ui:Label text="TU" class="hp-name local-name"/>
+                <ui:VisualElement class="hp-track">
+                    <ui:VisualElement name="local-hp-fill" class="hp-fill local-fill"/>
+                </ui:VisualElement>
+                <ui:Label name="local-hp-label" text="100 HP" class="hp-num"/>
+            </ui:VisualElement>
+
+            <ui:VisualElement class="hp-panel hp-panel-right">
+                <ui:Label text="OPONENT" class="hp-name enemy-name"/>
+                <ui:VisualElement class="hp-track">
+                    <ui:VisualElement name="enemy-hp-fill" class="hp-fill enemy-fill"/>
+                </ui:VisualElement>
+                <ui:Label name="enemy-hp-label" text="100 HP" class="hp-num"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Log de combat -->
+        <ui:Label name="combat-log" text="" class="combat-log"/>
+
+        <!-- Espai pel joc (transparent) -->
+        <ui:VisualElement class="game-area"/>
+
+        <!-- Controls inferiors -->
+        <ui:VisualElement class="bottom-bar">
+            <ui:VisualElement class="slider-group">
+                <ui:Label text="ANGLE" class="slider-label"/>
+                <ui:Slider name="angle-slider" low-value="0" high-value="90" value="45"/>
+            </ui:VisualElement>
+
+            <ui:Button name="fire-btn" class="fire-btn" text="FOCA"/>
+
+            <ui:VisualElement class="slider-group">
+                <ui:Label text="POTÈNCIA" class="slider-label"/>
+                <ui:Slider name="power-slider" low-value="0" high-value="100" value="75"/>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- Botó sortir -->
+        <ui:Button name="leave-btn" class="leave-btn" text="✕"/>
+
+    </ui:VisualElement>
+</ui:UXML>
