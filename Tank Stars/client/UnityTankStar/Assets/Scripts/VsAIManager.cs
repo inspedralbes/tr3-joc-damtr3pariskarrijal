@@ -1,7 +1,7 @@
-// VsAIManager — VS AI scene logic.
-// Uses the same CombatScreen.uxml as CombatManager.
-// UI binding is done in Start() with a 1-frame yield so the UIDocument
-// visual tree is fully built before we query elements.
+// VsAIManager — Lògica de la partida VS IA.
+// Utilitza el mateix CombatScreen.uxml que CombatManager.
+// L'UI es vincula a Start() amb un yield d'1 frame perquè el UIDocument
+// estigui completament construït abans de consultar els elements.
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Unity.MLAgents;
@@ -106,13 +106,13 @@ public class VsAIManager : MonoBehaviour
         if (powerSlider != null) powerSlider.value = 75f;
         if (turnBanner      != null) turnBanner.AddToClassList("hidden");
         if (gameOverOverlay != null) gameOverOverlay.AddToClassList("hidden");
-        if (connectionStatusLabel != null) connectionStatusLabel.text = "VS AI";
-        if (roomCodeLabel         != null) roomCodeLabel.text         = "VS AI Mode";
-        if (enemyPlayerNameLabel  != null) enemyPlayerNameLabel.text  = "AI";
+        if (connectionStatusLabel != null) connectionStatusLabel.text = "VS IA";
+        if (roomCodeLabel         != null) roomCodeLabel.text         = "Mode VS IA";
+        if (enemyPlayerNameLabel  != null) enemyPlayerNameLabel.text  = "IA";
 
         var gm = GameManager.EnsureInstance();
         if (localPlayerNameLabel != null)
-            localPlayerNameLabel.text = string.IsNullOrEmpty(gm?.username) ? "You" : gm.username;
+            localPlayerNameLabel.text = string.IsNullOrEmpty(gm?.username) ? "Tu" : gm.username;
         if (mapTypeLabel != null)
         {
             string mt = gm?.mapType ?? "desert";
@@ -194,14 +194,14 @@ public class VsAIManager : MonoBehaviour
     private void OnMoveLeft()
     {
         if (!IsPlayerTurn() || playerTank == null) return;
-        playerTank.Move(-1f, Time.deltaTime * 15f);
+        playerTank.Move(-1f, 0.2f);
         playerTank.PlaceOnTerrain();
     }
 
     private void OnMoveRight()
     {
         if (!IsPlayerTurn() || playerTank == null) return;
-        playerTank.Move(1f, Time.deltaTime * 15f);
+        playerTank.Move(1f, 0.2f);
         playerTank.PlaceOnTerrain();
     }
 
@@ -226,7 +226,7 @@ public class VsAIManager : MonoBehaviour
         if (!IsPlayerTurn()) return;
         isResolutionInProgress = true;
         SetControlsEnabled(false);
-        if (combatLogLabel != null) combatLogLabel.text = "Shot fired!";
+        if (combatLogLabel != null) combatLogLabel.text = "Tir llançat!";
 
         if (aiAgent == null || aiAgent.projectilePrefab == null)
         {
@@ -277,13 +277,13 @@ public class VsAIManager : MonoBehaviour
         if (hitTank)
         {
             aiTank.TakeDamage(35);
-            if (combatLogLabel != null) combatLogLabel.text = "Direct hit! -35 HP";
+            if (combatLogLabel != null) combatLogLabel.text = "Impacte directe! -35 HP";
         }
         else
         {
             float dist = Vector2.Distance(impactWorld, aiTank.transform.position);
-            if (dist < 1.5f) { aiTank.TakeDamage(15); if (combatLogLabel != null) combatLogLabel.text = "Near hit! -15 HP"; }
-            else { if (combatLogLabel != null) combatLogLabel.text = "Miss!"; }
+            if (dist < 1.5f) { aiTank.TakeDamage(15); if (combatLogLabel != null) combatLogLabel.text = "Gairebé! -15 HP"; }
+            else { if (combatLogLabel != null) combatLogLabel.text = "Aigua!"; }
         }
 
         OnProjectileResolved();
@@ -297,8 +297,8 @@ public class VsAIManager : MonoBehaviour
 
         RefreshHpBars();
 
-        if (aiTank != null && aiTank.currentHp <= 0)    { isGameOver = true; ShowGameOver("VICTORY!", "You destroyed the AI tank!"); return; }
-        if (playerTank != null && playerTank.currentHp <= 0) { isGameOver = true; ShowGameOver("DEFEAT", "The AI tank destroyed you."); return; }
+        if (aiTank != null && aiTank.currentHp <= 0)    { isGameOver = true; ShowGameOver("VICTÒRIA!", "Has destruït el tanc de la IA!"); return; }
+        if (playerTank != null && playerTank.currentHp <= 0) { isGameOver = true; ShowGameOver("DERROTA!", "La IA ha destruït el teu tanc..."); return; }
 
         isPlayerTurn = !isPlayerTurn;
         UpdateTurnUI();
@@ -361,8 +361,8 @@ public class VsAIManager : MonoBehaviour
     private void UpdateTurnUI()
     {
         if (!uiBound) return;
-        if (turnLabel != null) turnLabel.text = isPlayerTurn ? "Your turn" : "AI turn";
-        ShowTurnBanner(isPlayerTurn ? "YOUR TURN" : "AI TURN");
+        if (turnLabel != null) turnLabel.text = isPlayerTurn ? "El teu torn" : "Torn de la IA";
+        ShowTurnBanner(isPlayerTurn ? "EL TEU TORN" : "TORN DE LA IA");
         SetControlsEnabled(isPlayerTurn);
         playerTank?.StartTurn();
         if (!isPlayerTurn) aiTank?.StartTurn();
@@ -422,7 +422,7 @@ public class VsAIManager : MonoBehaviour
             gameOverTitle.text = title;
             gameOverTitle.RemoveFromClassList("game-over-title-victory");
             gameOverTitle.RemoveFromClassList("game-over-title-defeat");
-            gameOverTitle.AddToClassList(title == "VICTORY!" ? "game-over-title-victory" : "game-over-title-defeat");
+            gameOverTitle.AddToClassList(title == "VICTÒRIA!" ? "game-over-title-victory" : "game-over-title-defeat");
         }
         if (gameOverSubtitle != null) gameOverSubtitle.text = subtitle;
         if (goLocalHp != null) goLocalHp.text = playerTank != null ? playerTank.currentHp.ToString() : "0";

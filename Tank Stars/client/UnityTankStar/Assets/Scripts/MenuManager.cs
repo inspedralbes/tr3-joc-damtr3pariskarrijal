@@ -1,3 +1,4 @@
+// MenuManager — Gestiona el menú principal: selecció de mapa, crear/unir-se a partida, VS IA
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
@@ -67,8 +68,8 @@ public class MenuManager : MonoBehaviour
 
         var gameManager = GameManager.EnsureInstance();
         welcomeText.text = string.IsNullOrEmpty(gameManager.username)
-            ? "Welcome!"
-            : "Welcome, " + gameManager.username + "!";
+            ? "Benvingut!"
+            : "Benvingut, " + gameManager.username + "!";
         selectedMapIndex = GetMapIndex(gameManager.mapType);
         UpdateMapSelection();
 
@@ -155,7 +156,7 @@ public class MenuManager : MonoBehaviour
     IEnumerator CreateGame()
     {
         messageText.RemoveFromClassList("error-text");
-        messageText.text = "Creating game...";
+        messageText.text = "Creant partida...";
 
         var gameManager = GameManager.EnsureInstance();
         gameManager.mapType = MapTypes[selectedMapIndex];
@@ -181,7 +182,7 @@ public class MenuManager : MonoBehaviour
         else
         {
             messageText.AddToClassList("error-text");
-            messageText.text = "Could not create game. Is Docker running?";
+            messageText.text = "No s'ha pogut crear la partida. Docker està actiu?";
         }
     }
 
@@ -191,12 +192,12 @@ public class MenuManager : MonoBehaviour
         if (code.Length == 0)
         {
             messageText.AddToClassList("error-text");
-            messageText.text = "Please enter a room code.";
+            messageText.text = "Introdueix un codi de sala.";
             yield break;
         }
 
         messageText.RemoveFromClassList("error-text");
-        messageText.text = "Finding room...";
+        messageText.text = "Buscant sala...";
 
         UnityWebRequest findReq = UnityWebRequest.Get(apiUrl + "/games/room/" + code);
         yield return findReq.SendWebRequest();
@@ -204,7 +205,7 @@ public class MenuManager : MonoBehaviour
         if (findReq.result != UnityWebRequest.Result.Success)
         {
             messageText.AddToClassList("error-text");
-            messageText.text = "Room not found.";
+            messageText.text = "Sala no trobada.";
             yield break;
         }
 
@@ -231,7 +232,7 @@ public class MenuManager : MonoBehaviour
         else
         {
             messageText.AddToClassList("error-text");
-            messageText.text = "Could not join. Room may be full.";
+            messageText.text = "No s'ha pogut unir. La sala pot estar plena.";
         }
     }
 
@@ -270,15 +271,15 @@ public class MenuManager : MonoBehaviour
         switch (mapType)
         {
             case "snow":
-                return "Tall snowy ridges with narrow peaks and high cover.";
+                return "Crestes nevades altes amb pics estrets i bona cobertura.";
             case "grassland":
-                return "Rounded green hills with medium sightlines.";
+                return "Turons verds arrodonits amb línies de visió mitjanes.";
             case "canyon":
-                return "Deep center valley with steep edges and long shots.";
+                return "Vall profunda al centre amb vores escarpades i tirs llargs.";
             case "volcanic":
-                return "Sharp volcanic slopes with exposed high ground.";
+                return "Pendents volcànics afilats amb terreny alt exposat.";
             default:
-                return "Warm dunes with rolling cover and smooth craters.";
+                return "Dunes càlides amb cobertura suau i cràters arrodonits.";
         }
     }
 }

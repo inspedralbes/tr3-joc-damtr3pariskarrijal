@@ -1,3 +1,4 @@
+// TankAgent — Agent de tanc ML-Agents per a Tank Stars
 using UnityEngine;
 using Unity.MLAgents;
 using Unity.MLAgents.Sensors;
@@ -5,23 +6,22 @@ using Unity.MLAgents.Actuators;
 
 public class TankAgent : Agent
 {
-    [Header("Environment References")]
+    [Header("Referències")]
     public TerrainGenerator terrain;
     public TankController   localTank;
     public TankController   enemyTank;
     public GameObject       projectilePrefab;
     public GameObject       explosionPrefab;
 
-    [Header("State Control")]
+    [Header("Control d'estat")]
     public bool isVsAIMode        = false;
     public bool isWaitingForShot  = false;
     public bool canCaptureActions = false;
 
-    // NOTE: Do NOT override Initialize() to change BrainParameters at runtime.
-    // ML-Agents reads BrainParameters from the serialized BehaviorParameters component
-    // BEFORE Initialize() is called. Any changes made inside Initialize() are ignored
-    // by the time the model is loaded. Set the correct values directly on the
-    // BehaviorParameters component in the Inspector:
+    // NOTA: NO sobreescriure Initialize() per canviar BrainParameters en temps d'execució.
+    // ML-Agents llegeix BrainParameters del component BehaviorParameters serialitzat
+    // ABANS que Initialize() s'executi. Configurar els valors correctes directament
+    // al component BehaviorParameters a l'Inspector:
     //   Vector Observation > Space Size = 5
     //   Actions > Continuous Actions    = 2
     //   Actions > Discrete Branches     = 0
@@ -137,7 +137,7 @@ public class TankAgent : Agent
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        // Aims roughly at the enemy using a simple ballistic estimate
+        // Apunta aproximadament a l'enemic amb una estimació balística simple
         var actions = actionsOut.ContinuousActions;
         if (actions.Length < 2 || localTank == null || enemyTank == null)
         {
@@ -147,9 +147,9 @@ public class TankAgent : Agent
 
         float dist = Mathf.Abs(enemyTank.transform.position.x - localTank.transform.position.x);
         // Simple heuristic: angle ~45° scales with distance, power scales with distance
-        float normAngle = Mathf.Clamp(45f / 90f, 0f, 1f);       // ~45° → maps to 0 in [-1,1]
-        float normPower = Mathf.Clamp(dist / 18f, 0.1f, 1f);    // distance-based power
-        // Convert [0,1] → [-1,1] for the continuous action space
+        float normAngle = Mathf.Clamp(45f / 90f, 0f, 1f);       // ~45° → es mapeja a 0 en [-1,1]
+        float normPower = Mathf.Clamp(dist / 18f, 0.1f, 1f);    // potència basada en distància
+        // Convertir [0,1] → [-1,1] per l'espai d'accions contínues
         actions[0] = normAngle * 2f - 1f;
         actions[1] = normPower * 2f - 1f;
     }
@@ -187,7 +187,7 @@ public class TankAgent : Agent
         }
         else
         {
-            // Training rewards
+            // Recompenses d'entrenament
             if (hitTank)
             {
                 AddReward(1.0f);

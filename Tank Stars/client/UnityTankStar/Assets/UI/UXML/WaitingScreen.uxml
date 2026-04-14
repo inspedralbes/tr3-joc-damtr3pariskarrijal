@@ -9,10 +9,10 @@
 
         <ui:VisualElement class="card">
 
-            <ui:Label text="⏳ WAITING ROOM" class="title"
+            <ui:Label text="SALA D'ESPERA" class="title"
                       style="font-size:32px;"/>
 
-            <ui:Label text="Share this code with your opponent:"
+            <ui:Label text="Comparteix aquest codi amb el teu oponent:"
                       class="subtitle" style="font-size:16px;"/>
 
             <ui:Label name="room-code-text" text="ABC123" class="room-code"/>
@@ -21,16 +21,16 @@
             <ui:VisualElement class="divider"/>
 
             <ui:Label name="player1-status"
-                      text="✅  You are connected"
+                      text="✅ Connectat"
                       class="success-text"/>
 
             <ui:Label name="player2-status"
-                      text="⌛  Waiting for player 2..."
+                      text="⌛ Esperant jugador 2..."
                       class="status-text"/>
 
             <ui:VisualElement class="divider"/>
 
-            <ui:Button name="back-btn" class="btn-secondary" text="← BACK TO MENU"/>
+            <ui:Button name="back-btn" class="btn-secondary" text="← TORNAR AL MENÚ"/>
 
         </ui:VisualElement>
 

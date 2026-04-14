@@ -1,4 +1,4 @@
-// Gestor global del joc — persisteix entre escenes
+// GameManager — Gestor global del joc, singleton que persisteix entre escenes
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
@@ -10,9 +10,11 @@ public class GameManager : MonoBehaviour
     public int playerId;
     public string username;
 
+    // Mode de joc: Multijugador o VS IA
     public enum GameMode { Multiplayer, VsAI }
     public GameMode gameMode = GameMode.Multiplayer;
 
+    // Dades de la partida actual
     public int gameId;
     public string roomCode;
     public string mapType = "desert";

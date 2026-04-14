@@ -1,217 +1,90 @@
-// CombatManager — HUD-driven version.
-// CombatScreen.uxml is only the UI overlay; tanks and terrain should be scene objects.
+// CombatManager — Gestiona el combat multijugador vs player amb WebSocket
+// Utilitza GameObjects per als tancs, terreny i projectils. UI amb UI Toolkit.
 using System;
 using System.Collections;
 using System.Text;
 using System.Threading.Tasks;
-using NativeWebSocket;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UIElements;
+using NativeWebSocket;
 
 public class CombatManager : MonoBehaviour
 {
-    private const string SocketUrl       = "ws://localhost/game/";
-    private const float  DefaultP1X      = 15f;   // % across screen (0-100)
-    private const float  DefaultP2X      = 85f;
-    private const float  MoveStep        = 2f;    // % per button press
-    private const float  TerrainBottomPc = 26f;   // must match .world-terrain height in CSS
+    public static CombatManager Instance;
 
-    // ── UXML element references ─────────────────────────────────────────────
+    [Header("References")]
+    public TerrainGenerator terrain;
+    public TankController player1Tank;
+    public TankController player2Tank;
+    public GameObject projectilePrefab;
+    public GameObject explosionPrefab;
+    public Camera mainCamera;
 
-    // Game world
-    private VisualElement background;
-    private VisualElement localTank;
-    private VisualElement localBarrelPivot;
-    private VisualElement enemyTank;
-    private VisualElement enemyBarrelPivot;
-    private VisualElement projectileEl;
-    private VisualElement explosionEl;
+    private const string SocketUrl = "ws://localhost/game/";
 
-    // HUD
-    private Label    roomCodeLabel;
-    private Label    mapTypeLabel;
-    private Label    connectionStatusLabel;
-    private Label    turnLabel;
-    private Label    combatLogLabel;
-    private Label    localPlayerNameLabel;
-    private Label    enemyPlayerNameLabel;
-    private Label    angleValueLabel;
-    private Label    powerValueLabel;
+    // Referencies als elements UXML
+    private VisualElement root;
+    private Label turnLabel;
+    private Label combatLogLabel;
+    private Label angleValueLabel;
+    private Label powerValueLabel;
     private VisualElement localHpFill;
     private VisualElement enemyHpFill;
-    private VisualElement localHpAnchor;
-    private VisualElement enemyHpAnchor;
-    private Slider   angleSlider;
-    private Slider   powerSlider;
-    private Button   fireButton;
-    private Button   leaveButton;
-    private Button   moveLeftButton;
-    private Button   moveRightButton;
-    private Label    damagePopup;
+    private Slider angleSlider;
+    private Slider powerSlider;
+    private Button fireButton;
+    private Button leaveButton;
+    private Button moveLeftButton;
+    private Button moveRightButton;
     private VisualElement turnBanner;
-    private Label    turnBannerText;
+    private Label turnBannerText;
     private VisualElement gameOverOverlay;
-    private VisualElement gameOverCrown;
-    private Label    gameOverTitle;
-    private Label    gameOverSubtitle;
-    private Label    goLocalHp;
-    private Label    goEnemyHp;
-    private Label    goDuration;
-    private Button   goMenuBtn;
+    private Label gameOverTitle;
+    private Label gameOverSubtitle;
+    private Label goLocalHp;
+    private Label goEnemyHp;
+    private Label goDuration;
+    private Label connectionStatusLabel;
+    private Label roomCodeLabel;
+    private Label mapTypeLabel;
+    private Label localPlayerNameLabel;
+    private Label enemyPlayerNameLabel;
+    private Label damagePopup;
 
-    // ── Game state ──────────────────────────────────────────────────────────
-
-    private WebSocket    websocket;
-    private GameManager  gameManager;
-
-    private int   player1Id;
-    private int   player2Id;
-    private bool  isPlayer1;
-    private float player1X = DefaultP1X;
-    private float player2X = DefaultP2X;
-    private float localX   = DefaultP1X;
+    // WebSocket i estat del joc
+    private WebSocket websocket;
+    private GameManager gameManager;
+    private int player1Id;
+    private int player2Id;
+    private bool isPlayer1;
+    private float player1X = 15f;
+    private float player2X = 85f;
     private string activeMapType = "desert";
-    private bool  gameFinished;
-    private bool  shotInFlight;
-    private int   localHp  = 100;
-    private int   enemyHp  = 100;
+    private bool gameFinished;
+    private bool shotInFlight;
+    private int localHp = 100;
+    private int enemyHp = 100;
+    private int currentTurnPlayerId;
+    private bool uiBound = false;
 
+    // Coroutines追踪
     private Coroutine projectileRoutine;
     private Coroutine explosionRoutine;
-    private Coroutine damagePopupRoutine;
-    private Coroutine turnBannerRoutine;
-    private Coroutine gameOverRoutine;
+    private Coroutine shakeRoutine;
 
-    // Background image paths per map
-    private static readonly System.Collections.Generic.Dictionary<string, string> BgPaths
-        = new System.Collections.Generic.Dictionary<string, string>
-    {
-        { "desert",    "url('../Images/backgrounds/bg_desert.png')" },
-        { "snow",      "url('../Images/backgrounds/bg_snow.png')" },
-        { "grassland", "url('../Images/backgrounds/bg_grassland.png')" },
-        { "canyon",    "url('../Images/backgrounds/bg_canyon.png')" },
-        { "volcanic",  "url('../Images/backgrounds/bg_volcanic.png')" },
-    };
+    public TankController LocalTank => isPlayer1 ? player1Tank : player2Tank;
+    public TankController RemoteTank => isPlayer1 ? player2Tank : player1Tank;
+    public VisualElement LocalHpFill => isPlayer1 ? localHpFill : enemyHpFill;
+    public VisualElement EnemyHpFill => isPlayer1 ? enemyHpFill : localHpFill;
 
-    // Terrain colours per map
-    private static readonly System.Collections.Generic.Dictionary<string, Color> TerrainColors
-        = new System.Collections.Generic.Dictionary<string, Color>
-    {
-        { "desert",    new Color(0.66f, 0.52f, 0.23f) },
-        { "snow",      new Color(0.88f, 0.92f, 0.97f) },
-        { "grassland", new Color(0.39f, 0.63f, 0.27f) },
-        { "canyon",    new Color(0.59f, 0.35f, 0.22f) },
-        { "volcanic",  new Color(0.35f, 0.18f, 0.16f) },
-    };
+    void Awake() { Instance = this; }
 
-    // ── Lifecycle ────────────────────────────────────────────────────────────
-
-    void OnEnable()
-    {
-        var doc = GetComponent<UIDocument>();
-        if (doc == null) { Debug.LogError("CombatManager needs a UIDocument."); enabled = false; return; }
-
-        var root = doc.rootVisualElement;
-
-        // Game world elements
-        background       = root.Q<VisualElement>("background");
-        localTank        = root.Q<VisualElement>("local-tank");
-        localBarrelPivot = root.Q<VisualElement>("local-barrel-pivot");
-        enemyTank        = root.Q<VisualElement>("enemy-tank");
-        enemyBarrelPivot = root.Q<VisualElement>("enemy-barrel-pivot");
-        projectileEl     = root.Q<VisualElement>("projectile");
-        explosionEl      = root.Q<VisualElement>("explosion");
-
-        // HUD elements
-        roomCodeLabel         = root.Q<Label>("room-code-label");
-        mapTypeLabel          = root.Q<Label>("map-type-label");
-        connectionStatusLabel = root.Q<Label>("connection-status-label");
-        turnLabel             = root.Q<Label>("turn-label");
-        combatLogLabel        = root.Q<Label>("combat-log-label");
-        localPlayerNameLabel  = root.Q<Label>("local-player-name");
-        enemyPlayerNameLabel  = root.Q<Label>("enemy-player-name");
-        angleValueLabel       = root.Q<Label>("angle-value-label");
-        powerValueLabel       = root.Q<Label>("power-value-label");
-        localHpFill           = root.Q<VisualElement>("local-hp-fill");
-        enemyHpFill           = root.Q<VisualElement>("enemy-hp-fill");
-        localHpAnchor         = root.Q<VisualElement>("local-hp-anchor");
-        enemyHpAnchor         = root.Q<VisualElement>("enemy-hp-anchor");
-        angleSlider           = root.Q<Slider>("angle-slider");
-        powerSlider           = root.Q<Slider>("power-slider");
-        fireButton            = root.Q<Button>("fire-btn");
-        leaveButton           = root.Q<Button>("leave-btn");
-        moveLeftButton        = root.Q<Button>("move-left-btn");
-        moveRightButton       = root.Q<Button>("move-right-btn");
-        damagePopup           = root.Q<Label>("damage-popup");
-        turnBanner            = root.Q<VisualElement>("turn-banner");
-        turnBannerText        = root.Q<Label>("turn-banner-text");
-        gameOverOverlay       = root.Q<VisualElement>("game-over-overlay");
-        gameOverCrown         = root.Q<VisualElement>("game-over-crown");
-        gameOverTitle         = root.Q<Label>("game-over-title");
-        gameOverSubtitle      = root.Q<Label>("game-over-subtitle");
-        goLocalHp             = root.Q<Label>("go-local-hp");
-        goEnemyHp             = root.Q<Label>("go-enemy-hp");
-        goDuration            = root.Q<Label>("go-duration");
-        goMenuBtn             = root.Q<Button>("go-menu-btn");
-
-        if (fireButton == null || angleSlider == null || powerSlider == null)
-        {
-            Debug.LogError("CombatManager: missing UI elements. Check CombatScreen.uxml.");
-            enabled = false;
-            return;
-        }
-
-        gameManager = GameManager.EnsureInstance();
-
-        // Initial HUD text
-        if (roomCodeLabel != null)
-            roomCodeLabel.text = string.IsNullOrEmpty(gameManager.roomCode) ? "Room ------" : "Room " + gameManager.roomCode;
-        if (localPlayerNameLabel != null)
-            localPlayerNameLabel.text = string.IsNullOrEmpty(gameManager.username) ? "You" : gameManager.username;
-        if (enemyPlayerNameLabel != null)
-            enemyPlayerNameLabel.text = "Opponent";
-        if (connectionStatusLabel != null) connectionStatusLabel.text = "Connecting...";
-        if (turnLabel != null)             turnLabel.text = "Waiting...";
-        if (combatLogLabel != null)        combatLogLabel.text = "";
-        if (angleSlider != null)           angleSlider.value = 45f;
-        if (powerSlider != null)           powerSlider.value = 75f;
-        if (turnBanner != null)            turnBanner.AddToClassList("hidden");
-        if (gameOverOverlay != null)       gameOverOverlay.AddToClassList("hidden");
-        if (damagePopup != null)           damagePopup.AddToClassList("hidden");
-
-        SetHpBar(localHpFill, 100);
-        SetHpBar(enemyHpFill, 100);
-        UpdateSliderLabels();
-        SetFireEnabled(false);
-        SetMoveEnabled(false);
-
-        // Apply starting map
-        activeMapType = NormalizeMap(gameManager.mapType);
-        ApplyMap(activeMapType);
-
-        // Register callbacks
-        if (angleSlider != null) angleSlider.RegisterValueChangedCallback(_ => UpdateSliderLabels());
-        if (fireButton  != null) fireButton.clicked  += OnFireClicked;
-        if (leaveButton != null) leaveButton.clicked += OnLeaveClicked;
-        if (moveLeftButton  != null) moveLeftButton.clicked  += OnMoveLeft;
-        if (moveRightButton != null) moveRightButton.clicked += OnMoveRight;
-        if (goMenuBtn != null) goMenuBtn.clicked += OnLeaveClicked;
-
-        if (gameManager.gameId > 0 && gameManager.playerId > 0)
-            _ = ConnectWebSocket();
-        else if (connectionStatusLabel != null)
-            connectionStatusLabel.text = "No game context";
-    }
+    void Start() { StartCoroutine(InitUI()); }
 
     void OnDisable()
     {
-        if (fireButton  != null) fireButton.clicked  -= OnFireClicked;
-        if (leaveButton != null) leaveButton.clicked -= OnLeaveClicked;
-        if (moveLeftButton  != null) moveLeftButton.clicked  -= OnMoveLeft;
-        if (moveRightButton != null) moveRightButton.clicked -= OnMoveRight;
-        if (goMenuBtn != null) goMenuBtn.clicked -= OnLeaveClicked;
-
+        UnbindButtons();
         StopAllCoroutines();
         _ = CloseWebSocket();
     }
@@ -223,190 +96,122 @@ public class CombatManager : MonoBehaviour
 #endif
     }
 
-    // ── Map visuals ──────────────────────────────────────────────────────────
-
-    private void ApplyMap(string map)
+    // Inicialització UI
+    private IEnumerator InitUI()
     {
+        yield return null;
+
+        var uiDoc = GetComponent<UIDocument>();
+        if (uiDoc == null) { Debug.LogError("CombatManager: cal UIDocument!"); yield break; }
+
+        root = uiDoc.rootVisualElement;
+        if (root == null) { Debug.LogError("CombatManager: rootVisualElement és null!"); yield break; }
+
+        // Obtenir tots els elements UXML
+        turnLabel = root.Q<Label>("turn-label");
+        combatLogLabel = root.Q<Label>("combat-log-label");
+        angleValueLabel = root.Q<Label>("angle-value-label");
+        powerValueLabel = root.Q<Label>("power-value-label");
+        localHpFill = root.Q<VisualElement>("local-hp-fill");
+        enemyHpFill = root.Q<VisualElement>("enemy-hp-fill");
+        angleSlider = root.Q<Slider>("angle-slider");
+        powerSlider = root.Q<Slider>("power-slider");
+        fireButton = root.Q<Button>("fire-btn");
+        leaveButton = root.Q<Button>("leave-btn");
+        moveLeftButton = root.Q<Button>("move-left-btn");
+        moveRightButton = root.Q<Button>("move-right-btn");
+        turnBanner = root.Q<VisualElement>("turn-banner");
+        turnBannerText = root.Q<Label>("turn-banner-text");
+        gameOverOverlay = root.Q<VisualElement>("game-over-overlay");
+        gameOverTitle = root.Q<Label>("game-over-title");
+        gameOverSubtitle = root.Q<Label>("game-over-subtitle");
+        goLocalHp = root.Q<Label>("go-local-hp");
+        goEnemyHp = root.Q<Label>("go-enemy-hp");
+        goDuration = root.Q<Label>("go-duration");
+        connectionStatusLabel = root.Q<Label>("connection-status-label");
+        roomCodeLabel = root.Q<Label>("room-code-label");
+        mapTypeLabel = root.Q<Label>("map-type-label");
+        localPlayerNameLabel = root.Q<Label>("local-player-name");
+        enemyPlayerNameLabel = root.Q<Label>("enemy-player-name");
+        damagePopup = root.Q<Label>("damage-popup");
+
+        gameManager = GameManager.EnsureInstance();
+
+        // Valors inicials
+        if (angleSlider != null) angleSlider.value = 45f;
+        if (powerSlider != null) powerSlider.value = 75f;
+        if (turnBanner != null) turnBanner.AddToClassList("hidden");
+        if (gameOverOverlay != null) gameOverOverlay.AddToClassList("hidden");
+        if (damagePopup != null) damagePopup.AddToClassList("hidden");
+        if (connectionStatusLabel != null) connectionStatusLabel.text = "Connectant...";
+        if (roomCodeLabel != null) roomCodeLabel.text = "Sala " + (string.IsNullOrEmpty(gameManager.roomCode) ? "------" : gameManager.roomCode);
+
+        if (localPlayerNameLabel != null) localPlayerNameLabel.text = string.IsNullOrEmpty(gameManager.username) ? "Tu" : gameManager.username;
+        if (enemyPlayerNameLabel != null) enemyPlayerNameLabel.text = "Oponent";
         if (mapTypeLabel != null)
-            mapTypeLabel.text = char.ToUpper(map[0]) + map.Substring(1);
-    }
+        {
+            string mt = gameManager.mapType ?? "desert";
+            mapTypeLabel.text = char.ToUpper(mt[0]) + mt.Substring(1);
+        }
 
-    // ── Tank placement (% → CSS left/bottom) ────────────────────────────────
-
-    private void PlaceTanks()
-    {
-        // local tank
-        float lx = (player1Id == 0) ? DefaultP1X : (isPlayer1 ? player1X : player2X);
-        float ex = (player1Id == 0) ? DefaultP2X : (isPlayer1 ? player2X : player1X);
-        PlaceTank(localTank, lx, facingRight: lx <= ex);
-        PlaceTank(enemyTank, ex, facingRight: ex < lx);
-        ApplyBarrelAngle(angleSlider != null ? angleSlider.value : 45f);
-    }
-
-    // xPercent is 0-100 across the screen width.
-    // We use CSS left % for horizontal position.
-    private void PlaceTank(VisualElement tank, float xPercent, bool facingRight)
-    {
-        if (tank == null) return;
-        // Offset by half the tank width (~6%) so the centre lands at xPercent
-        tank.style.left  = Length.Percent(xPercent - 6f);
-        tank.style.scale = new StyleScale(new Scale(new Vector3(facingRight ? 1f : -1f, 1f, 1f)));
-    }
-
-    private void ApplyBarrelAngle(float angle)
-    {
-        // Local barrel (always positive — CSS rotate is clockwise for positive)
-        if (localBarrelPivot != null)
-            localBarrelPivot.style.rotate = new StyleRotate(new Rotate(new Angle(-angle, AngleUnit.Degree)));
-
-        // Enemy barrel — mirrored via scale:-1 in CSS, so same angle works
-        if (enemyBarrelPivot != null)
-            enemyBarrelPivot.style.rotate = new StyleRotate(new Rotate(new Angle(-angle, AngleUnit.Degree)));
-    }
-
-    private void PositionHpAnchor(VisualElement anchor, VisualElement tank)
-    {
-        if (anchor == null || tank == null) return;
-        anchor.style.display = DisplayStyle.Flex;
-        anchor.style.left    = tank.style.left;
-        anchor.style.bottom  = Length.Percent(TerrainBottomPc + 12f);
-    }
-
-    // ── Movement ─────────────────────────────────────────────────────────────
-
-    private void OnMoveLeft()
-    {
-        if (!CanMove()) return;
-        float min = isPlayer1 ? 3f : 58f;
-        float max = isPlayer1 ? 42f : 97f;
-        float newX = Mathf.Clamp(localX - MoveStep, min, max);
-        ApplyLocalMove(newX);
-    }
-
-    private void OnMoveRight()
-    {
-        if (!CanMove()) return;
-        float min = isPlayer1 ? 3f : 58f;
-        float max = isPlayer1 ? 42f : 97f;
-        float newX = Mathf.Clamp(localX + MoveStep, min, max);
-        ApplyLocalMove(newX);
-    }
-
-    private void ApplyLocalMove(float newX)
-    {
-        localX = newX;
-        if (isPlayer1) player1X = newX; else player2X = newX;
-        PlaceTanks();
-        _ = SendJson(new MoveTankMessage { type = "move_tank", gameId = gameManager.gameId, playerId = gameManager.playerId, newX = newX });
-    }
-
-    // ── Fire ─────────────────────────────────────────────────────────────────
-
-    private async void OnFireClicked()
-    {
-        if (!CanFire()) return;
-
-        int angle = Mathf.RoundToInt(angleSlider != null ? angleSlider.value : 45f);
-        int power = Mathf.RoundToInt(powerSlider != null ? powerSlider.value : 75f);
-
-        if (combatLogLabel != null) combatLogLabel.text = "Shot fired!";
-
-        shotInFlight = true;
+        SetHpBar(localHpFill, 100);
+        SetHpBar(enemyHpFill, 100);
+        UpdateSliderLabels();
         SetFireEnabled(false);
         SetMoveEnabled(false);
 
-        float landingX = PredictLandingX(localX, angle, power, isPlayer1);
-        if (localTank != null)
-            StartProjectileArc(localTank, landingX);
+        // Amagar tancs fins que arribi game_start
+        if (player1Tank != null) player1Tank.gameObject.SetActive(false);
+        if (player2Tank != null) player2Tank.gameObject.SetActive(false);
 
-        await SendJson(new FireShotMessage { type = "fire_shot", gameId = gameManager.gameId, playerId = gameManager.playerId, angle = angle, power = power });
-    }
+        // Registrar callbacks dels botons
+        if (angleSlider != null) angleSlider.RegisterValueChangedCallback(_ => UpdateSliderLabels());
+        if (powerSlider != null) powerSlider.RegisterValueChangedCallback(_ => UpdateSliderLabels());
+        if (fireButton != null) fireButton.clicked += OnFireClicked;
+        if (leaveButton != null) leaveButton.clicked += OnLeaveClicked;
+        if (moveLeftButton != null) moveLeftButton.clicked += OnMoveLeft;
+        if (moveRightButton != null) moveRightButton.clicked += OnMoveRight;
+        var goMenuBtn = root.Q<Button>("go-menu-btn");
+        if (goMenuBtn != null) goMenuBtn.clicked += OnLeaveClicked;
 
-    // Simple arc: move projectile from tank position to landing position
-    private void StartProjectileArc(VisualElement fromTank, float toLandingX)
-    {
-        StopTracked(ref projectileRoutine);
-        projectileRoutine = StartCoroutine(AnimateProjectile(fromTank, toLandingX));
-    }
+        uiBound = true;
 
-    private IEnumerator AnimateProjectile(VisualElement fromTank, float toLandingX)
-    {
-        if (projectileEl == null) yield break;
-
-        float startX = float.IsNaN(fromTank.style.left.value.value) ? 15f : fromTank.style.left.value.value + 6f;
-        float startY = TerrainBottomPc + 12f;
-        float endX   = toLandingX;
-        float endY   = TerrainBottomPc + 2f;
-        float arc    = 25f; // % of screen height for arc peak
-
-        projectileEl.RemoveFromClassList("hidden");
-        float duration = 0.9f;
-        float elapsed  = 0f;
-
-        while (elapsed < duration)
+        // Connectar al WebSocket
+        if (gameManager.gameId > 0 && gameManager.playerId > 0)
         {
-            elapsed += Time.deltaTime;
-            float t = Mathf.Clamp01(elapsed / duration);
-            float x = Mathf.Lerp(startX, endX, t);
-            float y = Mathf.Lerp(startY, endY, t) + arc * Mathf.Sin(Mathf.PI * t);
-            projectileEl.style.left   = Length.Percent(x);
-            projectileEl.style.bottom = Length.Percent(y);
-            yield return null;
+            _ = ConnectWebSocket();
         }
-
-        projectileEl.AddToClassList("hidden");
-        shotInFlight = false;
-        SetFireEnabled(IsMyTurn() && !gameFinished);
-        SetMoveEnabled(IsMyTurn() && !gameFinished);
-        projectileRoutine = null;
-    }
-
-    // ── Explosion ────────────────────────────────────────────────────────────
-
-    private void PlayExplosion(float xPercent)
-    {
-        StopTracked(ref explosionRoutine);
-        explosionRoutine = StartCoroutine(AnimateExplosion(xPercent));
-    }
-
-    private IEnumerator AnimateExplosion(float xPercent)
-    {
-        if (explosionEl == null) yield break;
-
-        string[] frames = {
-            "Images/vfx/explosion_01", "Images/vfx/explosion_02",
-            "Images/vfx/explosion_03", "Images/vfx/explosion_04",
-            "Images/vfx/explosion_05", "Images/vfx/explosion_06",
-            "Images/vfx/explosion_07", "Images/vfx/explosion_08",
-        };
-
-        explosionEl.style.left   = Length.Percent(xPercent - 4f);
-        explosionEl.style.bottom = Length.Percent(TerrainBottomPc - 2f);
-        explosionEl.RemoveFromClassList("hidden");
-
-        foreach (string path in frames)
+        else
         {
-            var tex = Resources.Load<Texture2D>(path);
-            if (tex != null) explosionEl.style.backgroundImage = new StyleBackground(tex);
-            yield return new WaitForSeconds(0.07f);
+            if (connectionStatusLabel != null) connectionStatusLabel.text = "Sense context de joc";
         }
-
-        explosionEl.AddToClassList("hidden");
-        explosionRoutine = null;
     }
 
-    // ── WebSocket ────────────────────────────────────────────────────────────
-
+    // WebSocket
     private async Task ConnectWebSocket()
     {
-        websocket = new WebSocket(SocketUrl);
-        websocket.OnOpen    += () => { if (connectionStatusLabel != null) connectionStatusLabel.text = "Joining..."; _ = SendJoinGame(); };
-        websocket.OnMessage += bytes => HandleMessage(Encoding.UTF8.GetString(bytes));
-        websocket.OnError   += err  => { if (connectionStatusLabel != null) connectionStatusLabel.text = "Error"; shotInFlight = false; SetFireEnabled(false); };
-        websocket.OnClose   += _    => { if (!gameFinished && connectionStatusLabel != null) connectionStatusLabel.text = "Disconnected"; };
+        try
+        {
+            websocket = new WebSocket(SocketUrl);
+            websocket.OnOpen += () => { 
+                if (connectionStatusLabel != null) connectionStatusLabel.text = "Unint-se..."; 
+                _ = SendJoinGame(); 
+            };
+            websocket.OnMessage += bytes => HandleMessage(Encoding.UTF8.GetString(bytes));
+            websocket.OnError += err => { 
+                if (connectionStatusLabel != null) connectionStatusLabel.text = "Error de connexió"; 
+            };
+            websocket.OnClose += _ => { 
+                if (!gameFinished && connectionStatusLabel != null) connectionStatusLabel.text = "Desconnectat"; 
+            };
 
-        try { await websocket.Connect(); }
-        catch (Exception ex) { if (connectionStatusLabel != null) connectionStatusLabel.text = "Cannot connect: " + ex.Message; }
+            await websocket.Connect();
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("CombatManager: Error de connexió: " + ex.Message);
+            if (connectionStatusLabel != null) connectionStatusLabel.text = "No connectat";
+        }
     }
 
     private async Task CloseWebSocket()
@@ -424,16 +229,16 @@ public class CombatManager : MonoBehaviour
 
     private async Task SendJson(object payload)
     {
-        if (websocket == null || websocket.State != WebSocketState.Open)
-        { if (connectionStatusLabel != null) connectionStatusLabel.text = "Not connected"; return; }
+        if (websocket == null || websocket.State != WebSocketState.Open) return;
         await websocket.SendText(JsonUtility.ToJson(payload));
     }
 
-    // ── Message handling ─────────────────────────────────────────────────────
-
+    // Gestió de missatges del servidor
     private void HandleMessage(string json)
     {
-        SocketMessage msg = JsonUtility.FromJson<SocketMessage>(json);
+        Debug.Log("[CombatManager] WS rebut: " + json);
+
+        var msg = JsonUtility.FromJson<SocketMessage>(json);
         if (msg == null || string.IsNullOrEmpty(msg.type)) return;
 
         switch (msg.type)
@@ -443,9 +248,22 @@ public class CombatManager : MonoBehaviour
                 break;
 
             case "joined_waiting":
-                ApplyMapFromMsg(msg);
-                if (connectionStatusLabel != null) connectionStatusLabel.text = "Waiting...";
-                if (combatLogLabel != null) combatLogLabel.text = "Waiting for opponent";
+                activeMapType = NormalizeMap(msg.mapType);
+                if (connectionStatusLabel != null) connectionStatusLabel.text = "Esperant oponent...";
+                if (combatLogLabel != null) combatLogLabel.text = "Esperant jugador 2...";
+                break;
+
+            case "game_start":
+            case "game_update":
+                ApplyGameState(msg);
+                break;
+
+            case "game_end":
+                ApplyGameState(msg);
+                break;
+
+            case "terrain_destroyed":
+                ApplyTerrainDestruction(msg);
                 break;
 
             case "positions_update":
@@ -453,170 +271,316 @@ public class CombatManager : MonoBehaviour
                 if (msg.player2X > 0) player2X = msg.player2X;
                 break;
 
-            case "game_start":
-            case "game_update":
-            case "game_end":
-                ApplyGameState(msg);
-                break;
-
-            case "terrain_destroyed":
-                PlayExplosion(msg.impactX);
-                break;
-
             case "error":
-                if (connectionStatusLabel != null) connectionStatusLabel.text = "Error";
                 if (combatLogLabel != null) combatLogLabel.text = msg.message;
                 shotInFlight = false;
-                SetFireEnabled(IsMyTurn() && !gameFinished);
-                SetMoveEnabled(IsMyTurn() && !gameFinished);
+                SetFireEnabled(IsMyTurn());
+                SetMoveEnabled(IsMyTurn());
                 break;
         }
     }
 
     private void ApplyGameState(SocketMessage msg)
     {
-        ApplyMapFromMsg(msg);
-
+        // Determinar quin jugador som
         player1Id = msg.player1Id;
         player2Id = msg.player2Id;
         isPlayer1 = gameManager.playerId == player1Id;
 
+        // Posicions dels jugadors (0-100% -> espai mundial)
         if (msg.player1X > 0) player1X = msg.player1X;
         if (msg.player2X > 0) player2X = msg.player2X;
-        localX = isPlayer1 ? player1X : player2X;
 
-        int newLocalHp = isPlayer1 ? msg.player1Hp : msg.player2Hp;
-        int newEnemyHp = isPlayer1 ? msg.player2Hp : msg.player1Hp;
-        SetHpBar(localHpFill, newLocalHp);
-        SetHpBar(enemyHpFill, newEnemyHp);
-        localHp = newLocalHp;
-        enemyHp = newEnemyHp;
+        // HP
+        localHp = isPlayer1 ? msg.player1Hp : msg.player2Hp;
+        enemyHp = isPlayer1 ? msg.player2Hp : msg.player1Hp;
+        SetHpBar(LocalHpFill, localHp);
+        SetHpBar(EnemyHpFill, enemyHp);
 
-        if (localPlayerNameLabel != null)
-            localPlayerNameLabel.text = string.IsNullOrEmpty(gameManager.username) ? "You" : gameManager.username;
-        if (!string.IsNullOrEmpty(msg.roomCode) && roomCodeLabel != null)
-            roomCodeLabel.text = "Room " + msg.roomCode;
+        if (LocalTank != null) LocalTank.currentHp = localHp;
+        if (RemoteTank != null) RemoteTank.currentHp = enemyHp;
 
-        gameFinished = msg.type == "game_end" || msg.status == "finished";
-        bool myTurn  = msg.currentTurnPlayerId == gameManager.playerId;
-
-        if (gameFinished)
-        {
-            if (connectionStatusLabel != null) connectionStatusLabel.text = "Finished";
-            if (turnLabel != null) turnLabel.text = msg.winnerPlayerId == gameManager.playerId ? "VICTORY!" : "DEFEAT";
-            ShowGameOver(msg);
-        }
-        else
-        {
-            if (connectionStatusLabel != null) connectionStatusLabel.text = "Live";
-            if (turnLabel != null) turnLabel.text = myTurn ? "Your turn" : "Enemy turn";
-            if (msg.type == "game_start" || myTurn) ShowTurnBanner(myTurn ? "YOUR TURN" : "ENEMY TURN");
-        }
-
-        if (msg.type == "game_update" && msg.lastAttackerPlayerId != 0 && msg.lastDamage > 0)
-            ShowDamagePopup(msg.lastDamage, msg.lastLandingX);
-
-        SetFireEnabled(myTurn && !gameFinished && !shotInFlight);
-        SetMoveEnabled(myTurn && !gameFinished && !shotInFlight);
-        if (combatLogLabel != null) combatLogLabel.text = BuildLog(msg);
-    }
-
-    private void ApplyMapFromMsg(SocketMessage msg)
-    {
+        // Actualitzar mapa
         if (!string.IsNullOrEmpty(msg.mapType))
         {
             activeMapType = NormalizeMap(msg.mapType);
             gameManager.mapType = activeMapType;
-            ApplyMap(activeMapType);
+            if (mapTypeLabel != null) mapTypeLabel.text = char.ToUpper(activeMapType[0]) + activeMapType.Substring(1);
         }
-    }
 
-    // ── Game over ────────────────────────────────────────────────────────────
-
-    private void ShowGameOver(SocketMessage msg)
-    {
-        if (gameOverOverlay == null) return;
-        bool won = msg.winnerPlayerId == gameManager.playerId;
-
-        if (gameOverTitle != null)
+        // Generar terreny si és game_start
+        if (msg.type == "game_start" && terrain != null)
         {
-            gameOverTitle.text = won ? "VICTORY!" : "DEFEAT";
-            gameOverTitle.RemoveFromClassList("game-over-title-victory");
-            gameOverTitle.RemoveFromClassList("game-over-title-defeat");
-            gameOverTitle.AddToClassList(won ? "game-over-title-victory" : "game-over-title-defeat");
-        }
-        if (gameOverSubtitle != null)
-            gameOverSubtitle.text = won ? "You destroyed the enemy tank!" : "Your tank was destroyed...";
-        if (goLocalHp  != null) goLocalHp.text  = localHp.ToString();
-        if (goEnemyHp  != null) goEnemyHp.text  = enemyHp.ToString();
-        if (goDuration != null) goDuration.text  = msg.durationSeconds + "s";
+            // Utilitzar gameManager.gameId com a seed (msg.gameId pot ser 0 si el servidor no l'envia a game_start)
+            int seed = msg.gameId > 0 ? msg.gameId : gameManager.gameId;
+            Debug.Log($"[CombatManager] game_start: seed={seed}, map={activeMapType}, p1X={player1X}, p2X={player2X}");
+            terrain.GenerateTerrain(seed, activeMapType);
 
-        StopTracked(ref gameOverRoutine);
-        gameOverRoutine = StartCoroutine(ShowGameOverDelay(1.5f));
+            // Mostrar tancs i col·locar-los
+            if (player1Tank != null) player1Tank.gameObject.SetActive(true);
+            if (player2Tank != null) player2Tank.gameObject.SetActive(true);
+            PlaceTanksFromPercent();
+        }
+
+        // Torn actual
+        currentTurnPlayerId = msg.currentTurnPlayerId;
+        bool myTurn = msg.currentTurnPlayerId == gameManager.playerId;
+
+        // Comprovar fi de partida
+        gameFinished = msg.type == "game_end" || msg.status == "finished";
+
+        if (gameFinished)
+        {
+            if (connectionStatusLabel != null) connectionStatusLabel.text = "FI DE PARTIDA";
+            bool won = msg.winnerPlayerId == gameManager.playerId;
+            if (turnLabel != null) turnLabel.text = won ? "VICTÒRIA!" : "DERROTA!";
+            ShowGameOver(won, msg.durationSeconds);
+        }
+        else
+        {
+            if (connectionStatusLabel != null) connectionStatusLabel.text = "En directe";
+            if (turnLabel != null) turnLabel.text = myTurn ? "El teu torn" : "Torn de l'oponent";
+            ShowTurnBanner(myTurn ? "EL TEU TORN" : "TORN OPONENT");
+
+            // Actualitzar posicions dels tancs
+            if (msg.player1X > 0 || msg.player2X > 0)
+            {
+                PlaceTanksFromPercent();
+            }
+        }
+
+        // Missatge de l'últim tir
+        if (msg.lastDamage > 0 && combatLogLabel != null)
+        {
+            string who = msg.lastAttackerPlayerId == gameManager.playerId ? "Tu" : "Oponent";
+            string resultat = msg.lastShotResult == "direct_hit" ? "impacte directe!" : msg.lastShotResult == "near_hit" ? "gairebé!" : "aigua!";
+            combatLogLabel.text = $"{who}: {msg.lastAngle}°/{msg.lastPower}% {resultat} (-{msg.lastDamage} HP)";
+
+            // Animar projectil des del servidor
+            if (!string.IsNullOrEmpty(msg.lastShotResult))
+            {
+                float attackerX = msg.lastAttackerPlayerId == player1Id ? player1X : player2X;
+                bool isLocalAttacker = msg.lastAttackerPlayerId == gameManager.playerId;
+                var shooter = isLocalAttacker ? LocalTank : RemoteTank;
+                var target = isLocalAttacker ? RemoteTank : LocalTank;
+                if (shooter != null && target != null)
+                {
+                    bool facingRight = shooter.transform.position.x < target.transform.position.x;
+                    shooter.SetBarrelAngle(msg.lastAngle, facingRight);
+                    AnimateProjectile(shooter.transform.position, msg.lastLandingX, msg.lastAngle, msg.lastPower, facingRight);
+                }
+
+                // Mostrar dany
+                if (msg.lastDamage > 0)
+                {
+                    ShowDamagePopup(msg.lastDamage, msg.lastLandingX);
+                }
+
+                // Exploció
+                if (msg.lastImpactX > 0 && msg.lastImpactY > 0)
+                {
+                    PlayExplosion(msg.lastImpactX, msg.lastImpactY);
+                }
+            }
+        }
+
+        // Actualitzar controls
+        SetFireEnabled(myTurn && !gameFinished && !shotInFlight);
+        SetMoveEnabled(myTurn && !gameFinished && !shotInFlight);
+
+        // Actualitzar log
+        if (combatLogLabel != null && msg.lastDamage == 0 && !gameFinished)
+        {
+            combatLogLabel.text = "";
+        }
     }
 
-    private IEnumerator ShowGameOverDelay(float delay)
+    private void ApplyTerrainDestruction(SocketMessage msg)
+    {
+        if (terrain == null) return;
+        // Convertir impactX de 0-100% a espai mundial
+        float worldX = (msg.impactX / 100f) * terrain.width - terrain.width / 2f;
+        Vector2 impactWorld = new Vector2(worldX, msg.impactY);
+        terrain.DestroyTerrain(impactWorld, msg.radius);
+        player1Tank?.PlaceOnTerrain();
+        player2Tank?.PlaceOnTerrain();
+    }
+
+    private void PlaceTanksFromPercent()
+    {
+        if (terrain == null) return;
+
+        // Convertir posicions de 0-100% a espai mundial
+        float p1World = (player1X / 100f) * terrain.width - terrain.width / 2f;
+        float p2World = (player2X / 100f) * terrain.width - terrain.width / 2f;
+
+        if (player1Tank != null)
+        {
+            player1Tank.transform.position = new Vector3(p1World, player1Tank.transform.position.y, 0);
+            player1Tank.PlaceOnTerrain();
+        }
+        if (player2Tank != null)
+        {
+            player2Tank.transform.position = new Vector3(p2World, player2Tank.transform.position.y, 0);
+            player2Tank.PlaceOnTerrain();
+        }
+    }
+
+    // Botons
+    public void OnMoveLeft()
+    {
+        if (!CanMove()) return;
+        LocalTank.Move(-1f, 0.2f);
+        LocalTank.PlaceOnTerrain();
+        float newXPerc = (LocalTank.transform.position.x + terrain.width / 2f) / terrain.width * 100f;
+        _ = SendJson(new MoveTankMessage { type = "move_tank", gameId = gameManager.gameId, playerId = gameManager.playerId, newX = newXPerc });
+    }
+
+    public void OnMoveRight()
+    {
+        if (!CanMove()) return;
+        LocalTank.Move(1f, 0.2f);
+        LocalTank.PlaceOnTerrain();
+        float newXPerc = (LocalTank.transform.position.x + terrain.width / 2f) / terrain.width * 100f;
+        _ = SendJson(new MoveTankMessage { type = "move_tank", gameId = gameManager.gameId, playerId = gameManager.playerId, newX = newXPerc });
+    }
+
+    public void OnFireClicked()
+    {
+        if (!CanFire()) return;
+        float angle = angleSlider != null ? angleSlider.value : 45f;
+        float power = powerSlider != null ? powerSlider.value : 75f;
+        FireShot(angle, power);
+    }
+
+    public void FireShot(float angle, float power)
+    {
+        if (!CanFire()) return;
+
+        if (combatLogLabel != null) combatLogLabel.text = "Tir llançat!";
+
+        shotInFlight = true;
+        SetFireEnabled(false);
+        SetMoveEnabled(false);
+
+        bool facingRight = LocalTank.transform.position.x < RemoteTank.transform.position.x;
+        LocalTank.SetBarrelAngle(angle, facingRight);
+
+        // Animar projectil localment cap a posició preddita
+        float landingX = PredictLandingX(LocalTank.transform.position.x, angle, power, isPlayer1);
+        AnimateProjectile(LocalTank.transform.position, landingX, angle, power, facingRight);
+
+        _ = SendJson(new FireShotMessage { type = "fire_shot", gameId = gameManager.gameId, playerId = gameManager.playerId, angle = Mathf.RoundToInt(angle), power = Mathf.RoundToInt(power) });
+    }
+
+    private void OnLeaveClicked()
+    {
+        gameManager.ResetMatchState();
+        SceneManager.LoadScene("MenuScene");
+    }
+
+    private void UnbindButtons()
+    {
+        if (!uiBound || root == null) return;
+        if (fireButton != null) fireButton.clicked -= OnFireClicked;
+        if (leaveButton != null) leaveButton.clicked -= OnLeaveClicked;
+        if (moveLeftButton != null) moveLeftButton.clicked -= OnMoveLeft;
+        if (moveRightButton != null) moveRightButton.clicked -= OnMoveRight;
+    }
+
+    // Animació del projectil
+    private void AnimateProjectile(Vector3 startPos, float landingXPercent, float angle, float power, bool facingRight)
+    {
+        if (projectilePrefab == null) return;
+
+        float landingWorldX = (landingXPercent / 100f) * terrain.width - terrain.width / 2f;
+        Vector3 endPos = new Vector3(landingWorldX, terrain.GetHeightAtX(landingWorldX) + 0.5f, 0);
+
+        StopTracked(ref projectileRoutine);
+        projectileRoutine = StartCoroutine(AnimateProjectileArc(startPos, endPos));
+    }
+
+    private IEnumerator AnimateProjectileArc(Vector3 start, Vector3 end)
+    {
+        var proj = Instantiate(projectilePrefab, start, Quaternion.identity);
+        var rb = proj.GetComponent<Rigidbody2D>();
+        if (rb == null) { Destroy(proj); yield break; }
+
+        float duration = 1.2f;
+        float elapsed = 0f;
+        float arcHeight = 3f;
+
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float x = Mathf.Lerp(start.x, end.x, t);
+            float y = Mathf.Lerp(start.y, end.y, t) + arcHeight * Mathf.Sin(Mathf.PI * t);
+            proj.transform.position = new Vector3(x, y, 0);
+            yield return null;
+        }
+
+        Destroy(proj);
+    }
+
+    private void PlayExplosion(float impactXPercent, float impactY)
+    {
+        if (explosionPrefab == null) return;
+
+        StopTracked(ref explosionRoutine);
+        float worldX = (impactXPercent / 100f) * terrain.width - terrain.width / 2f;
+        var exp = Instantiate(explosionPrefab, new Vector3(worldX, impactY, 0), Quaternion.identity);
+        explosionRoutine = StartCoroutine(DestroyAfterDelay(exp, 1f));
+    }
+
+    private IEnumerator DestroyAfterDelay(GameObject obj, float delay)
     {
         yield return new WaitForSeconds(delay);
-        if (gameOverOverlay != null) gameOverOverlay.RemoveFromClassList("hidden");
-        gameOverRoutine = null;
+        Destroy(obj);
     }
-
-    // ── Turn banner ──────────────────────────────────────────────────────────
-
-    private void ShowTurnBanner(string text)
-    {
-        if (turnBanner == null || turnBannerText == null) return;
-        StopTracked(ref turnBannerRoutine);
-        turnBannerRoutine = StartCoroutine(AnimateTurnBanner(text));
-    }
-
-    private IEnumerator AnimateTurnBanner(string text)
-    {
-        turnBannerText.text = text;
-        turnBanner.RemoveFromClassList("hidden");
-        yield return new WaitForSeconds(1.2f);
-        turnBanner.AddToClassList("hidden");
-        turnBannerRoutine = null;
-    }
-
-    // ── Damage popup ─────────────────────────────────────────────────────────
 
     private void ShowDamagePopup(int damage, float xPercent)
     {
         if (damagePopup == null) return;
-        StopTracked(ref damagePopupRoutine);
-        damagePopupRoutine = StartCoroutine(AnimateDamagePopup(damage, xPercent));
-    }
-
-    private IEnumerator AnimateDamagePopup(int damage, float xPercent)
-    {
+        float worldX = (xPercent / 100f) * terrain.width - terrain.width / 2f;
         damagePopup.text = "-" + damage;
-        damagePopup.style.left   = Length.Percent(xPercent);
-        damagePopup.style.bottom = Length.Percent(TerrainBottomPc + 18f);
+        damagePopup.style.left = Length.Percent(xPercent);
+        damagePopup.style.bottom = Length.Percent(35f);
         damagePopup.style.opacity = 1f;
         damagePopup.RemoveFromClassList("hidden");
 
-        float elapsed = 0f;
-        while (elapsed < 0.8f)
-        {
-            elapsed += Time.deltaTime;
-            damagePopup.style.opacity = 1f - (elapsed / 0.8f);
-            yield return null;
-        }
-
-        damagePopup.AddToClassList("hidden");
-        damagePopupRoutine = null;
+        StartCoroutine(FadeDamagePopup());
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
-
-    private void SetHpBar(VisualElement fill, int hp)
+    private IEnumerator FadeDamagePopup()
     {
-        if (fill == null) return;
-        fill.style.width = Length.Percent(Mathf.Clamp(hp, 0, 100));
+        yield return new WaitForSeconds(0.8f);
+        if (damagePopup != null)
+        {
+            damagePopup.style.opacity = 0f;
+            damagePopup.AddToClassList("hidden");
+        }
     }
 
+    private void CameraShake()
+    {
+        if (mainCamera == null) return;
+        StopTracked(ref shakeRoutine);
+        shakeRoutine = StartCoroutine(DoCameraShake());
+    }
+
+    private IEnumerator DoCameraShake()
+    {
+        Vector3 original = mainCamera.transform.position;
+        for (int i = 0; i < 6; i++)
+        {
+            mainCamera.transform.position = original + (Vector3)UnityEngine.Random.insideUnitCircle * 0.15f;
+            yield return new WaitForSeconds(0.05f);
+        }
+        mainCamera.transform.position = original;
+    }
+
+    // UI helpers
     private void UpdateSliderLabels()
     {
         if (angleValueLabel != null && angleSlider != null)
@@ -625,30 +589,32 @@ public class CombatManager : MonoBehaviour
             powerValueLabel.text = Mathf.RoundToInt(powerSlider.value).ToString();
     }
 
+    private void SetHpBar(VisualElement fill, int hp)
+    {
+        if (fill == null) return;
+        fill.style.width = Length.Percent(Mathf.Clamp(hp, 0, 100));
+    }
+
     private void SetFireEnabled(bool on)
     {
         if (fireButton == null) return;
-        // Allow firing locally for testing even without WebSocket
-        bool canFire = on && !gameFinished && !shotInFlight && player1Id != 0 && IsMyTurn();
-        fireButton.SetEnabled(canFire);
+        fireButton.SetEnabled(on);
     }
 
     private void SetMoveEnabled(bool on)
     {
-        bool ok = on && !shotInFlight;
-        if (moveLeftButton  != null) moveLeftButton.SetEnabled(ok);
-        if (moveRightButton != null) moveRightButton.SetEnabled(ok);
+        if (moveLeftButton != null) moveLeftButton.SetEnabled(on);
+        if (moveRightButton != null) moveRightButton.SetEnabled(on);
     }
 
-    private bool IsMyTurn() => turnLabel != null && turnLabel.text == "Your turn";
-
-    private bool CanFire()  => !gameFinished && !shotInFlight && player1Id != 0 && IsMyTurn();
-
-    private bool CanMove()  => !gameFinished && !shotInFlight && player1Id != 0 && IsMyTurn();
+    public bool IsMyTurn() => gameManager != null && currentTurnPlayerId == gameManager.playerId;
+    public bool IsCurrentTurn() => gameManager != null && currentTurnPlayerId == gameManager.playerId;
+    public bool CanFire() => gameManager != null && !gameFinished && !shotInFlight && currentTurnPlayerId == gameManager.playerId;
+    public bool CanMove() => gameManager != null && !gameFinished && !shotInFlight && currentTurnPlayerId == gameManager.playerId;
 
     private float PredictLandingX(float attackerX, float angle, float power, bool p1)
     {
-        float distance  = (power / 100f) * 80f * Mathf.Sin(2f * angle * Mathf.Deg2Rad);
+        float distance = (power / 100f) * 80f * Mathf.Sin(2f * angle * Mathf.Deg2Rad);
         float direction = p1 ? 1f : -1f;
         return Mathf.Clamp(attackerX + distance * direction, 0f, 100f);
     }
@@ -661,60 +627,81 @@ public class CombatManager : MonoBehaviour
         return "desert";
     }
 
-    private string BuildLog(SocketMessage msg)
+    private void ShowTurnBanner(string text)
     {
-        if (gameFinished)
-            return (msg.winnerPlayerId == gameManager.playerId ? "Victory" : "Defeat") + " — " + msg.durationSeconds + "s";
-        if (msg.type == "game_start")
-            return msg.currentTurnPlayerId == gameManager.playerId ? "You go first!" : "Opponent starts";
-        if (msg.lastAttackerPlayerId == 0) return "";
-        string who = msg.lastAttackerPlayerId == gameManager.playerId ? "You" : "Enemy";
-        string res = msg.lastShotResult == "direct_hit" ? "direct hit!" : msg.lastShotResult == "near_hit" ? "near hit" : "miss";
-        return $"{who}: {msg.lastAngle}° / {msg.lastPower}%  {res}  ({msg.lastDamage} dmg)";
+        if (turnBanner == null || turnBannerText == null) return;
+        turnBannerText.text = text;
+        turnBanner.RemoveFromClassList("hidden");
+        CancelInvoke(nameof(HideTurnBanner));
+        Invoke(nameof(HideTurnBanner), 1.2f);
     }
 
-    private void OnLeaveClicked()
+    private void HideTurnBanner() { if (turnBanner != null) turnBanner.AddToClassList("hidden"); }
+
+    private void ShowGameOver(bool won, int duration)
     {
-        gameManager.ResetMatchState();
-        SceneManager.LoadScene("MenuScene");
+        SetFireEnabled(false);
+        SetMoveEnabled(false);
+
+        if (gameOverTitle != null)
+        {
+            gameOverTitle.text = won ? "VICTÒRIA!" : "DERROTA!";
+            gameOverTitle.RemoveFromClassList("game-over-title-victory");
+            gameOverTitle.RemoveFromClassList("game-over-title-defeat");
+            gameOverTitle.AddToClassList(won ? "game-over-title-victory" : "game-over-title-defeat");
+        }
+        if (gameOverSubtitle != null)
+            gameOverSubtitle.text = won ? "Has destruït el tanc enemic!" : "El teu tanc ha estat destruït...";
+        if (goLocalHp != null) goLocalHp.text = localHp.ToString();
+        if (goEnemyHp != null) goEnemyHp.text = enemyHp.ToString();
+        if (goDuration != null) goDuration.text = duration + "s";
+
+        StartCoroutine(ShowGameOverDelay(1.5f));
+    }
+
+    private IEnumerator ShowGameOverDelay(float delay)
+    {
+        yield return new WaitForSeconds(delay);
+        if (gameOverOverlay != null) gameOverOverlay.RemoveFromClassList("hidden");
     }
 
     private void StopTracked(ref Coroutine c) { if (c != null) { StopCoroutine(c); c = null; } }
 }
 
-// ── Network message types ────────────────────────────────────────────────────
-
-[Serializable] public class JoinGameMessage  { public string type; public int gameId; public int playerId; }
-[Serializable] public class FireShotMessage  { public string type; public int gameId; public int playerId; public int angle; public int power; }
-[Serializable] public class MoveTankMessage  { public string type; public int gameId; public int playerId; public float newX; }
+// Missatges WebSocket
+[Serializable] public class JoinGameMessage { public string type; public int gameId; public int playerId; }
+[Serializable] public class FireShotMessage { public string type; public int gameId; public int playerId; public int angle; public int power; }
+[Serializable] public class MoveTankMessage { public string type; public int gameId; public int playerId; public float newX; }
 
 [Serializable]
 public class SocketMessage
 {
     public string type;
     public string message;
-    public int    gameId;
+    public int gameId;
     public string roomCode;
     public string mapType;
-    public int    player1Id;
-    public int    player2Id;
-    public int    player1Hp;
-    public int    player2Hp;
-    public float  player1X;
-    public float  player2X;
-    public int    currentTurnPlayerId;
-    public int    winnerPlayerId;
+    public int player1Id;
+    public int player2Id;
+    public int player1Hp;
+    public int player2Hp;
+    public float player1X;
+    public float player2X;
+    public int currentTurnPlayerId;
+    public int winnerPlayerId;
     public string status;
     public string lastShotResult;
-    public int    lastDamage;
-    public float  lastLandingX;
-    public int    lastAttackerPlayerId;
-    public int    lastAngle;
-    public int    lastPower;
-    public float  impactX;
-    public float  impactY;
-    public float  radius;
-    public int    durationSeconds;
-    public int[]  terrainHeights;
-    public int    terrainEventId;
+    public int lastDamage;
+    public float lastLandingX;
+    public int lastAttackerPlayerId;
+    public int lastAngle;
+    public int lastPower;
+    public float lastImpactX;
+    public float lastImpactY;
+    public float impactX;
+    public float impactY;
+    public float radius;
+    public int durationSeconds;
+    public int[] terrainHeights;
+    public int terrainEventId;
 }

@@ -1,3 +1,4 @@
+// AuthManager — Gestiona el registre i l'inici de sessió de l'usuari
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
@@ -77,7 +78,7 @@ public class AuthManager : MonoBehaviour
     {
         messageText.RemoveFromClassList("error-text");
         messageText.RemoveFromClassList("success-text");
-        messageText.text = "Registering...";
+        messageText.text = "Registrant...";
 
         string json = "{\"username\":\"" + usernameField.value +
                       "\",\"password\":\"" + passwordField.value + "\"}";
@@ -93,12 +94,12 @@ public class AuthManager : MonoBehaviour
         if (req.result == UnityWebRequest.Result.Success)
         {
             messageText.AddToClassList("success-text");
-            messageText.text = "Account created! You can now log in.";
+            messageText.text = "Compte creat! Ara pots iniciar sessió.";
         }
         else
         {
             messageText.AddToClassList("error-text");
-            messageText.text = "Username already exists.";
+            messageText.text = "El nom d'usuari ja existeix.";
         }
     }
 
@@ -106,7 +107,7 @@ public class AuthManager : MonoBehaviour
     {
         messageText.RemoveFromClassList("error-text");
         messageText.RemoveFromClassList("success-text");
-        messageText.text = "Logging in...";
+        messageText.text = "Iniciant sessió...";
 
         string json = "{\"username\":\"" + usernameField.value +
                       "\",\"password\":\"" + passwordField.value + "\"}";
@@ -131,7 +132,7 @@ public class AuthManager : MonoBehaviour
         else
         {
             messageText.AddToClassList("error-text");
-            messageText.text = "Wrong username or password.";
+            messageText.text = "Nom d'usuari o contrasenya incorrectes.";
         }
     }
 }

@@ -1,4 +1,4 @@
-// Controla un tanc: HP, moviment sobre el terreny i visualització
+// TankController — Controla un tanc: HP, moviment sobre el terreny i rotació del canó
 using UnityEngine;
 
 public class TankController : MonoBehaviour
@@ -11,41 +11,40 @@ public class TankController : MonoBehaviour
     public Transform        barrel;
     public TerrainGenerator terrain;
 
-    [Header("Stats")]
+    [Header("Estadístiques")]
     public int   currentHp    = 100;
     public int   maxHp        = 100;
 
     [Header("Moviment")]
-    public float moveSpeed        = 4f;   // world units per second
-    public float maxMovePerTurn   = 2.5f; // total distance allowed per turn
-    public float worldBoundsX     = 9.5f; // can't go beyond ±this
+    public float moveSpeed        = 4f;   // unitats mundials per segon
+    public float maxMovePerTurn   = 2.5f; // distància total permesa per torn
+    public float worldBoundsX     = 9.5f; // no pot anar més enllà de ±aquest valor
 
-    // Tracking
+    // Seguiment de distància moguda
     private float _distanceMovedThisTurn = 0f;
     public  float DistanceMovedThisTurn => _distanceMovedThisTurn;
 
-    // ─── Terrain placement ────────────────────────────────────────────────
+    // ─── Col·locació al terreny ───────────────────────────────────────────
 
-    /// <summary>Snaps the tank to sit exactly on the terrain surface.</summary>
+    /// <summary>Col·loca el tanc exactament sobre la superfície del terreny.</summary>
     public void PlaceOnTerrain()
     {
         if (terrain == null) return;
-        // GetHeightAtX now returns WORLD Y — just add a small half-body offset
         float worldY = terrain.GetHeightAtX(transform.position.x);
         transform.position = new Vector3(transform.position.x, worldY + 0.35f, 0f);
     }
 
-    // ─── Turn management ─────────────────────────────────────────────────
+    // ─── Gestió de torns ─────────────────────────────────────────────────
 
-    /// <summary>Call at the start of this tank's turn to reset the movement budget.</summary>
+    /// <summary>Crida a l'inici del torn per reiniciar el pressupost de moviment.</summary>
     public void StartTurn() => _distanceMovedThisTurn = 0f;
 
-    // ─── Movement ─────────────────────────────────────────────────────────
+    // ─── Moviment ─────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Moves the tank horizontally, following the terrain surface.
-    /// Returns the actual distance moved (may be less than requested if at limit or world edge).
-    /// direction: -1 (left) to +1 (right).
+    /// Mou el tanc horitzontalment seguint la superfície del terreny.
+    /// Retorna la distància real moguda.
+    /// direction: -1 (esquerra) a +1 (dreta).
     /// </summary>
     public float Move(float direction, float deltaTime)
     {
@@ -60,7 +59,7 @@ public class TankController : MonoBehaviour
 
         if (Mathf.Abs(actualStep) < 0.0001f) return 0f;
 
-        // Move and snap to terrain
+        // Moure i enganxar al terreny
         transform.position = new Vector3(newX, transform.position.y, 0f);
         PlaceOnTerrain();
 
@@ -68,22 +67,26 @@ public class TankController : MonoBehaviour
         return actualStep;
     }
 
-    /// <summary>Checks whether this tank has used up its movement budget.</summary>
+    /// <summary>Comprova si el tanc encara pot moure's aquest torn.</summary>
     public bool CanStillMove() => _distanceMovedThisTurn < maxMovePerTurn;
 
     // ─── Combat ──────────────────────────────────────────────────────────
 
-    /// <summary>Applies damage to the tank (cannot go below 0).</summary>
+    /// <summary>Aplica dany al tanc (no pot baixar de 0).</summary>
     public void TakeDamage(int amount)
     {
         currentHp = Mathf.Max(0, currentHp - amount);
+        if (currentHp <= 0)
+        {
+            PlaceOnTerrain();
+        }
     }
 
     public bool IsAlive => currentHp > 0;
 
-    // ─── Barrel ──────────────────────────────────────────────────────────
+    // ─── Canó ────────────────────────────────────────────────────────────
 
-    /// <summary>Rotates the barrel to the given angle in degrees.</summary>
+    /// <summary>Rota el canó a l'angle donat en graus.</summary>
     public void SetBarrelAngle(float angleDegrees, bool facingRight)
     {
         if (barrel == null) return;

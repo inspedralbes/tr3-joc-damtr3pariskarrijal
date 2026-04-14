@@ -1,3 +1,4 @@
+// WaitingManager — Mostra la sala d'espera i fa polling per detectar el jugador 2
 using UnityEngine;
 using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
@@ -48,7 +49,7 @@ public class WaitingManager : MonoBehaviour
         roomCodeText.text = gameManager.roomCode;
         if (mapTypeText != null)
         {
-            mapTypeText.text = "Map: " + FormatMapType(gameManager.mapType);
+            mapTypeText.text = "Mapa: " + FormatMapType(gameManager.mapType);
         }
 
         backBtn.clicked += OnBackClick;
@@ -57,7 +58,7 @@ public class WaitingManager : MonoBehaviour
         if (gameId <= 0)
         {
             roomCodeText.text = string.IsNullOrEmpty(gameManager.roomCode) ? "------" : gameManager.roomCode;
-            player2Status.text = "Unable to poll for players because no game was created.";
+            player2Status.text = "No es pot consultar perquè no s'ha creat cap partida.";
             return;
         }
 
@@ -101,7 +102,7 @@ public class WaitingManager : MonoBehaviour
                 {
                     player2Status.RemoveFromClassList("status-text");
                     player2Status.AddToClassList("success-text");
-                    player2Status.text = "✅  Player 2 joined! Starting...";
+                    player2Status.text = "✅ Jugador 2 connectat! Començant...";
                     yield return new WaitForSeconds(1.5f);
                     SceneManager.LoadScene("CombatScene");
                     yield break;

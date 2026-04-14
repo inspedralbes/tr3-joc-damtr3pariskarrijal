@@ -12,20 +12,20 @@
         <ui:VisualElement class="top-bar">
             <ui:Label name="room-code-label" text="Room ------" class="mini-top-text"/>
             <ui:Label name="map-type-label" text="Desert" class="mini-top-text mini-map-text"/>
-            <ui:Label name="turn-label" text="Waiting..." class="turn-label"/>
-            <ui:Label name="connection-status-label" text="Connecting..." class="mini-top-text"/>
+            <ui:Label name="turn-label" text="Esperant..." class="turn-label"/>
+            <ui:Label name="connection-status-label" text="Connectant..." class="mini-top-text"/>
         </ui:VisualElement>
 
         <ui:VisualElement class="hp-row">
             <ui:VisualElement class="hp-panel">
-                <ui:Label name="local-player-name" text="You" class="hp-name local-name"/>
+                <ui:Label name="local-player-name" text="Tu" class="hp-name local-name"/>
                 <ui:VisualElement class="hp-track">
                     <ui:VisualElement name="local-hp-fill" class="hp-fill local-fill"/>
                 </ui:VisualElement>
             </ui:VisualElement>
 
             <ui:VisualElement class="hp-panel hp-panel-right">
-                <ui:Label name="enemy-player-name" text="Opponent" class="hp-name enemy-name"/>
+                <ui:Label name="enemy-player-name" text="Oponent" class="hp-name enemy-name"/>
                 <ui:VisualElement class="hp-track">
                     <ui:VisualElement name="enemy-hp-fill" class="hp-fill enemy-fill"/>
                 </ui:VisualElement>
@@ -34,7 +34,7 @@
 
         <ui:VisualElement class="game-area">
             <ui:VisualElement name="turn-banner" class="turn-banner hidden">
-                <ui:Label name="turn-banner-text" text="YOUR TURN" class="turn-banner-text"/>
+                <ui:Label name="turn-banner-text" text="EL TEU TORN" class="turn-banner-text"/>
             </ui:VisualElement>
 
             <ui:Label name="damage-popup" text="" class="damage-popup hidden"/>
@@ -50,14 +50,14 @@
 
             <ui:VisualElement style="align-items:center;">
                 <ui:VisualElement class="move-row">
-                    <ui:Button name="move-left-btn" class="move-btn" text="LEFT"/>
-                    <ui:Button name="fire-btn" class="fire-btn" text="FIRE"/>
-                    <ui:Button name="move-right-btn" class="move-btn" text="RIGHT"/>
+                    <ui:Button name="move-left-btn" class="move-btn" text="◀"/>
+                    <ui:Button name="fire-btn" class="fire-btn" text="FOCA"/>
+                    <ui:Button name="move-right-btn" class="move-btn" text="▶"/>
                 </ui:VisualElement>
             </ui:VisualElement>
 
             <ui:VisualElement class="slider-group">
-                <ui:Label text="POWER" class="slider-label"/>
+                <ui:Label text="POTÈNCIA" class="slider-label"/>
                 <ui:Label name="power-value-label" text="75" class="corner-value"/>
                 <ui:Slider name="power-slider" low-value="0" high-value="100" value="75"/>
             </ui:VisualElement>
@@ -67,24 +67,24 @@
             <ui:VisualElement name="game-over-overlay" class="game-over-overlay hidden">
                 <ui:VisualElement class="game-over-card">
                     <ui:VisualElement name="game-over-crown" class="game-over-crown"/>
-                    <ui:Label name="game-over-title" text="VICTORY!" class="game-over-title"/>
+                    <ui:Label name="game-over-title" text="VICTÒRIA!" class="game-over-title"/>
                     <ui:Label name="game-over-subtitle" text="" class="game-over-subtitle"/>
                     <ui:VisualElement class="divider"/>
                     <ui:VisualElement class="game-over-stats">
                         <ui:VisualElement class="stat-row">
-                            <ui:Label text="Your HP" class="stat-label"/>
+                            <ui:Label text="Els teus HP" class="stat-label"/>
                             <ui:Label name="go-local-hp" text="100" class="stat-value stat-value-blue"/>
                         </ui:VisualElement>
                         <ui:VisualElement class="stat-row">
-                            <ui:Label text="Enemy HP" class="stat-label"/>
+                            <ui:Label text="HP enemic" class="stat-label"/>
                             <ui:Label name="go-enemy-hp" text="0" class="stat-value stat-value-red"/>
                         </ui:VisualElement>
                         <ui:VisualElement class="stat-row">
-                            <ui:Label text="Duration" class="stat-label"/>
+                            <ui:Label text="Durada" class="stat-label"/>
                             <ui:Label name="go-duration" text="0s" class="stat-value"/>
                         </ui:VisualElement>
                     </ui:VisualElement>
-                    <ui:Button name="go-menu-btn" class="btn-primary go-menu-btn" text="Back to Menu"/>
+                    <ui:Button name="go-menu-btn" class="btn-primary go-menu-btn" text="Tornar al menú"/>
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>
