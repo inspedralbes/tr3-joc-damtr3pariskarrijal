@@ -313,6 +313,26 @@ function calculateShot(session, attackerPlayerId, angle, power) {
   };
 }
 
+function handleMoveTank(ws, payload) {
+  const session = sessions.get(ws.sessionGameId);
+  if (!session || session.status !== 'active') return;
+
+  const playerId = parseInt(payload.playerId, 10);
+  if (playerId !== ws.playerId || playerId !== session.currentTurnPlayerId) return;
+
+  const newX = Math.max(5, Math.min(95, Number(payload.newX)));
+  if (!Number.isFinite(newX)) return;
+
+  if (playerId === session.player1Id) session.player1X = newX;
+  else session.player2X = newX;
+
+  broadcast(session, {
+    type: 'positions_update',
+    player1X: session.player1X,
+    player2X: session.player2X,
+  });
+}
+
 function handleFireShot(ws, payload) {
   const session = sessions.get(ws.sessionGameId);
   if (!session) {
@@ -427,6 +447,9 @@ wss.on('connection', (ws) => {
           break;
         case 'fire_shot':
           handleFireShot(ws, payload);
+          break;
+        case 'move_tank':
+          handleMoveTank(ws, payload);
           break;
         default:
           sendError(ws, 'Unknown message type.');

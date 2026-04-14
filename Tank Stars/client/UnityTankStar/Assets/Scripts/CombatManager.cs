@@ -367,7 +367,11 @@ public class CombatManager : MonoBehaviour
             {
                 bool facingRight = shooter.transform.position.x < target.transform.position.x;
                 shooter.SetBarrelAngle(msg.lastAngle, facingRight);
-                AnimateProjectile(shooter.transform.position, msg.lastLandingX, msg.lastAngle, msg.lastPower, facingRight);
+                // Only re-animate if we are NOT the attacker — the local shooter already
+                // saw the predictive animation in FireShot(). The arc coroutine also
+                // spawns the explosion at the correct world position, so no PlayExplosion needed.
+                if (!isLocalAttacker)
+                    AnimateProjectile(shooter.transform.position, msg.lastLandingX, msg.lastAngle, msg.lastPower, facingRight);
             }
 
             if (combatLogLabel != null && msg.lastDamage > 0)
@@ -380,9 +384,6 @@ public class CombatManager : MonoBehaviour
 
             if (msg.lastDamage > 0)
                 ShowDamagePopup(msg.lastDamage, msg.lastLandingX);
-
-            if (msg.lastImpactX > 0 && msg.lastImpactY > 0)
-                PlayExplosion(msg.lastImpactX, msg.lastImpactY);
         }
         else if (combatLogLabel != null)
         {
@@ -418,8 +419,14 @@ public class CombatManager : MonoBehaviour
     private void HandleTerrainDestroyed(SocketMessage msg)
     {
         if (terrain == null) return;
+        // impactX is 0-100% → convert to world X
         float worldX = (msg.impactX / 100f) * terrain.width - terrain.width / 2f;
-        terrain.DestroyTerrain(new Vector2(worldX, msg.impactY), msg.radius);
+        // Use the Unity terrain's actual surface Y at that X (server impactY is in its own
+        // 0-100 scale, not Unity world space — using it directly puts craters way above terrain)
+        float worldY = terrain.GetHeightAtX(worldX);
+        // radius is also in server's 0-100% scale → convert to world units
+        float worldRadius = (msg.radius / 100f) * terrain.width;
+        terrain.DestroyTerrain(new Vector2(worldX, worldY), worldRadius);
         player1Tank?.PlaceOnTerrain();
         player2Tank?.PlaceOnTerrain();
     }
@@ -597,14 +604,6 @@ public class CombatManager : MonoBehaviour
     }
 
     // ── Efectes ────────────────────────────────────────────────────────────
-
-    private void PlayExplosion(float impactXPercent, float impactY)
-    {
-        if (explosionPrefab == null || terrain == null) return;
-        float worldX = (impactXPercent / 100f) * terrain.width - terrain.width / 2f;
-        var exp = Instantiate(explosionPrefab, new Vector3(worldX, impactY, 0), Quaternion.identity);
-        Destroy(exp, 1.5f);
-    }
 
     private void ShowDamagePopup(int damage, float xPercent)
     {
