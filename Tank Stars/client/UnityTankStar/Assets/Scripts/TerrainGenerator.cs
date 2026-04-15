@@ -39,25 +39,35 @@ public class TerrainGenerator : MonoBehaviour
         Random.InitState(seed);
         float offset = Random.Range(0f, 10000f);
 
-        // Configure biome settings based on project requirements
+        // Configure biome settings — shapes tuned aggressively per biome
         switch (mapType.ToLower())
         {
             case "snow":
-                currentGroundColor = new Color(0.9f, 0.95f, 1f);
-                maxHeight = 6.5f; noiseScale = 0.45f; break;
+                // Tall sharp peaks, high frequency variation
+                currentGroundColor = new Color(0.88f, 0.93f, 1f);
+                maxHeight = 7.5f; noiseScale = 0.55f;
+                octaves = 6; persistence = 0.6f; lacunarity = 2.4f; break;
             case "grassland":
-                currentGroundColor = new Color(0.2f, 0.8f, 0.3f);
-                maxHeight = 4.0f; noiseScale = 0.25f; break;
+                // Gentle rolling hills, very flat
+                currentGroundColor = new Color(0.18f, 0.72f, 0.25f);
+                maxHeight = 2.8f; noiseScale = 0.18f;
+                octaves = 3; persistence = 0.4f; lacunarity = 1.8f; break;
             case "canyon":
-                currentGroundColor = new Color(0.8f, 0.4f, 0.2f);
-                maxHeight = 7.0f; noiseScale = 0.55f; break;
+                // Deep valley forced in the center, high walls on both sides
+                currentGroundColor = new Color(0.76f, 0.35f, 0.15f);
+                maxHeight = 7.0f; noiseScale = 0.5f;
+                octaves = 4; persistence = 0.5f; lacunarity = 2.0f; break;
             case "volcanic":
-                currentGroundColor = new Color(0.3f, 0.1f, 0.1f);
-                maxHeight = 5.0f; noiseScale = 0.4f; break;
+                // Jagged sharp spikes, very irregular
+                currentGroundColor = new Color(0.22f, 0.08f, 0.08f);
+                maxHeight = 6.5f; noiseScale = 0.65f;
+                octaves = 7; persistence = 0.65f; lacunarity = 2.6f; break;
             case "desert":
             default:
-                currentGroundColor = new Color(0.9f, 0.7f, 0.3f);
-                maxHeight = 5.5f; noiseScale = 0.35f; break;
+                // Smooth dunes, moderate height
+                currentGroundColor = new Color(0.88f, 0.68f, 0.28f);
+                maxHeight = 4.5f; noiseScale = 0.28f;
+                octaves = 4; persistence = 0.45f; lacunarity = 2.0f; break;
         }
 
         heights = new float[columns];
@@ -68,6 +78,23 @@ public class TerrainGenerator : MonoBehaviour
             heights[i]  = baseHeight + fbm * maxHeight;
         }
 
+        // Canyon special case: carve a deep valley in the center third
+        if (mapType.ToLower() == "canyon")
+        {
+            for (int i = 0; i < columns; i++)
+            {
+                float xNorm = i / (float)(columns - 1);
+                // Distance from center (0=center, 1=edge)
+                float distFromCenter = Mathf.Abs(xNorm - 0.5f) * 2f;
+                // Only apply the valley to the middle 60%
+                if (distFromCenter < 0.6f)
+                {
+                    float valleyDepth = (1f - distFromCenter / 0.6f);
+                    heights[i] -= valleyDepth * 4.5f;
+                }
+            }
+        }
+
         // Clamp so terrain never goes above visible camera area
         for (int i = 0; i < columns; i++)
             heights[i] = Mathf.Clamp(heights[i], baseHeight + 0.3f, baseHeight + maxHeight);
@@ -75,11 +102,12 @@ public class TerrainGenerator : MonoBehaviour
         BuildMesh(currentGroundColor);
         BuildCollider();
 
-        // Assegurar que el material utilitza vertex colors
+        // Set material color directly via _BaseColor (works with URP Unlit shader)
+        // EnableKeyword("_VERTEX_COLORS") does NOT work in URP — material.color does.
         var rend = GetComponent<MeshRenderer>();
-        if (rend != null && rend.sharedMaterial != null)
+        if (rend != null)
         {
-            rend.material.EnableKeyword("_VERTEX_COLORS");
+            rend.material.color = currentGroundColor;
         }
     }
 
