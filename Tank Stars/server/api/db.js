@@ -7,4 +7,15 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'tankstars',
 });
 
+async function ensureSchema() {
+  const [rows] = await pool.query("SHOW COLUMNS FROM games LIKE 'map_type'");
+  if (rows.length === 0) {
+    await pool.query(`
+      ALTER TABLE games
+      ADD COLUMN map_type VARCHAR(20) NOT NULL DEFAULT 'desert'
+    `);
+  }
+}
+
 module.exports = pool;
+module.exports.ensureSchema = ensureSchema;

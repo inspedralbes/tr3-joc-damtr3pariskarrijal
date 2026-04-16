@@ -1,6 +1,7 @@
 const express = require('express');
 const router  = express.Router();
 const db      = require('../db');
+const MAP_TYPES = ['desert', 'snow', 'grassland', 'canyon', 'volcanic'];
 
 // Generates a random 6-character room code like "AB12CD"
 function generateRoomCode() {
@@ -14,8 +15,12 @@ function generateRoomCode() {
 
 // POST /games  — create a new game room
 router.post('/', async (req, res) => {
-    const { playerId } = req.body;
+    const { playerId, mapType } = req.body;
     if (!playerId) return res.status(400).json({ error: 'playerId required' });
+    const selectedMapType = (mapType || 'desert').toLowerCase();
+    if (!MAP_TYPES.includes(selectedMapType)) {
+        return res.status(400).json({ error: 'Invalid map type' });
+    }
 
     try {
         // Generate a unique room code
@@ -31,12 +36,12 @@ router.post('/', async (req, res) => {
         }
 
         const [result] = await db.query(
-            `INSERT INTO games (room_code, player1_id, status)
-             VALUES (?, ?, 'waiting')`,
-            [roomCode, playerId]
+            `INSERT INTO games (room_code, player1_id, map_type, status)
+             VALUES (?, ?, ?, 'waiting')`,
+            [roomCode, playerId, selectedMapType]
         );
 
-        res.json({ gameId: result.insertId, roomCode });
+        res.json({ gameId: result.insertId, roomCode, mapType: selectedMapType });
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Could not create game' });
