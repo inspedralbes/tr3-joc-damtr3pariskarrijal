@@ -1,0 +1,64 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: tankstars
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./server/api/database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  api:
+    build: ./server/api
+    container_name: api_service
+    ports:
+      - "3001:3001"
+    environment:
+      DB_HOST: mysql
+      DB_USER: root
+      DB_PASSWORD: root
+      DB_NAME: tankstars
+      JWT_SECRET: tankstars_secret_key
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  game:
+    build: ./server/game
+    container_name: game_service
+    ports:
+      - "3002:3002"
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api
+      - game
+
+  # ── ML-Agents Trainer (teacher's guide workflow) ─────────────────────────
+  # Runs the Python PPO trainer. Unity Editor connects to it on port 5004.
+  # Usage: docker compose run --rm --service-ports trainer \
+  #          mlagents-learn /workspace/simple.yaml --run-id=tankAgent1
+  trainer:
+    build: ./ml-agents
+    container_name: ml_trainer
+    ports:
+      - "5004:5004"   # Unity Editor communicates with trainer on this port
+    volumes:
+      - ./ml-agents/simple.yaml:/workspace/simple.yaml
+      - ./ml-agents/results:/workspace/results
+    stdin_open: true
+    tty: true

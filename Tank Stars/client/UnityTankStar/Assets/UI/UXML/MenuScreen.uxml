@@ -1,0 +1,50 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="False">
+
+    <ui:Style src="../USS/Styles.uss"/>
+
+    <ui:VisualElement name="root" class="root">
+
+        <ui:VisualElement class="card">
+
+            <ui:Label text="🎯 TANK STARS" class="title"/>
+            <ui:Label name="welcome-text" text="Benvingut, Jugador!" class="subtitle"/>
+
+            <ui:Label text="Mapa" class="input-label"/>
+            <ui:VisualElement class="map-picker">
+                <ui:Button name="map-prev-btn" class="map-select-btn" text="◀"/>
+                <ui:Label name="selected-map-label" text="Desert" class="map-pill"/>
+                <ui:Button name="map-next-btn" class="map-select-btn" text="▶"/>
+            </ui:VisualElement>
+            <ui:Label name="map-description-label" text="Dunes càlides amb cobertura suau i cràters arrodonits." class="helper-text"/>
+
+            <ui:Button name="create-btn" class="btn-primary" text="CREAR PARTIDA"/>
+            <ui:Button name="vs-ai-btn" class="btn-secondary" text="VS IA (Offline)"/>
+
+            <ui:VisualElement class="divider"/>
+
+            <ui:Label text="— o uneix-te amb un codi —" class="subtitle"
+                      style="font-size:14px; margin-bottom:10px;"/>
+
+            <ui:VisualElement class="join-row">
+                <ui:TextField
+                    name="room-code-input"
+                    class="join-input"
+                    placeholder-text="Codi de sala..."
+                    max-length="6"/>
+                <ui:Button name="join-btn" class="join-btn" text="UNIR"/>
+            </ui:VisualElement>
+
+            <ui:Label name="message-text" class="error-text" text=""/>
+
+            <ui:VisualElement class="divider"/>
+
+            <ui:Button name="quit-btn" class="btn-danger" text="SORTIR"/>
+
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+
+</ui:UXML>

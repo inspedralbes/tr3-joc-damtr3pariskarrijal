@@ -1,0 +1,37 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="../../UIElementsSchema/UIElements.xsd"
+         editor-extension-mode="False">
+
+    <ui:Style src="../USS/Styles.uss"/>
+
+    <ui:VisualElement name="root" class="root">
+
+        <ui:VisualElement class="card">
+
+            <ui:Label text="🎯 TANK STARS" class="title" name="game-title"/>
+            <ui:Label text="Inicia sessió" class="subtitle"/>
+
+            <ui:Label text="Nom d'usuari" class="input-label"/>
+            <ui:TextField
+                name="username-field"
+                class="input-field"
+                placeholder-text="Introdueix el nom d'usuari"/>
+
+            <ui:Label text="Contrasenya" class="input-label"/>
+            <ui:TextField
+                name="password-field"
+                class="input-field"
+                password="true"
+                placeholder-text="Introdueix la contrasenya"/>
+
+            <ui:Label name="message-text" class="error-text" text=""/>
+
+            <ui:Button name="login-btn" class="btn-primary" text="INICIAR SESSIÓ"/>
+            <ui:Button name="register-btn" class="btn-secondary" text="CREAR COMPTE"/>
+
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+
+</ui:UXML>
