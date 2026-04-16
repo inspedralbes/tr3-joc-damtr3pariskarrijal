@@ -1,0 +1,65 @@
+{
+    "TankBehavior": {
+        "checkpoints": [
+            {
+                "steps": 1699995,
+                "file_path": "results/tankAgentFresh/TankBehavior/TankBehavior-1699995.onnx",
+                "reward": 0.04321321159368381,
+                "creation_time": 1776362793.5590332,
+                "auxillary_file_paths": [
+                    "results/tankAgentFresh/TankBehavior/TankBehavior-1699995.pt"
+                ]
+            },
+            {
+                "steps": 1799990,
+                "file_path": "results/tankAgentFresh/TankBehavior/TankBehavior-1799990.onnx",
+                "reward": 0.01782750265362362,
+                "creation_time": 1776363511.4994805,
+                "auxillary_file_paths": [
+                    "results/tankAgentFresh/TankBehavior/TankBehavior-1799990.pt"
+                ]
+            },
+            {
+                "steps": 1899987,
+                "file_path": "results/tankAgentFresh/TankBehavior/TankBehavior-1899987.onnx",
+                "reward": 0.02918164693730195,
+                "creation_time": 1776364287.7350838,
+                "auxillary_file_paths": [
+                    "results/tankAgentFresh/TankBehavior/TankBehavior-1899987.pt"
+                ]
+            },
+            {
+                "steps": 1999990,
+                "file_path": "results/tankAgentFresh/TankBehavior/TankBehavior-1999990.onnx",
+                "reward": 0.0690654733677066,
+                "creation_time": 1776365009.5920622,
+                "auxillary_file_paths": [
+                    "results/tankAgentFresh/TankBehavior/TankBehavior-1999990.pt"
+                ]
+            },
+            {
+                "steps": 2000008,
+                "file_path": "results/tankAgentFresh/TankBehavior/TankBehavior-2000008.onnx",
+                "reward": 0.0665520259312221,
+                "creation_time": 1776365009.6373286,
+                "auxillary_file_paths": [
+                    "results/tankAgentFresh/TankBehavior/TankBehavior-2000008.pt"
+                ]
+            }
+        ],
+        "final_checkpoint": {
+            "steps": 2000008,
+            "file_path": "results/tankAgentFresh/TankBehavior.onnx",
+            "reward": 0.0665520259312221,
+            "creation_time": 1776365009.6373286,
+            "auxillary_file_paths": [
+                "results/tankAgentFresh/TankBehavior/TankBehavior-2000008.pt"
+            ]
+        }
+    },
+    "metadata": {
+        "stats_format_version": "0.3.0",
+        "mlagents_version": "1.1.0",
+        "torch_version": "2.4.1"
+    }
+}

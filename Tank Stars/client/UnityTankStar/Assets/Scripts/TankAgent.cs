@@ -22,7 +22,7 @@ public class TankAgent : Agent
     // ML-Agents llegeix BrainParameters del component BehaviorParameters serialitzat
     // ABANS que Initialize() s'executi. Configurar els valors correctes directament
     // al component BehaviorParameters a l'Inspector:
-    //   Vector Observation > Space Size = 5
+    //   Vector Observation > Space Size = 14
     //   Actions > Continuous Actions    = 2
     //   Actions > Discrete Branches     = 0
 
@@ -30,11 +30,14 @@ public class TankAgent : Agent
     {
         isWaitingForShot = false;
 
+        // Always generate terrain in training mode
+        if (terrain != null && !isVsAIMode)
+        {
+            terrain.GenerateTerrain(Random.Range(1, 99999), "desert");
+        }
+
         if (!isVsAIMode)
         {
-            if (terrain != null)
-                terrain.GenerateTerrain(Random.Range(1, 10000), "desert");
-
             if (localTank != null)
             {
                 localTank.transform.position = new Vector3(Random.Range(-8f, -2f), 0, 0);
@@ -54,43 +57,76 @@ public class TankAgent : Agent
     {
         if (localTank == null || enemyTank == null)
         {
-            for (int i = 0; i < 5; i++) sensor.AddObservation(0f);
+            for (int i = 0; i < 14; i++) sensor.AddObservation(0f);
             return;
         }
 
+        float dx = enemyTank.transform.position.x - localTank.transform.position.x;
+        float dy = enemyTank.transform.position.y - localTank.transform.position.y;
+        float dist = Mathf.Sqrt(dx * dx + dy * dy);
+        float angleToEnemy = Mathf.Atan2(dy, Mathf.Abs(dx)) * Mathf.Rad2Deg;
+
         sensor.AddObservation(localTank.transform.position.x / 10f);
+        sensor.AddObservation(localTank.transform.position.y / 5f);
         sensor.AddObservation(enemyTank.transform.position.x / 10f);
-        sensor.AddObservation((enemyTank.transform.position.x - localTank.transform.position.x) / 20f);
-        sensor.AddObservation(localTank.currentHp / 100f);
-        sensor.AddObservation(enemyTank.currentHp / 100f);
+        sensor.AddObservation(enemyTank.transform.position.y / 5f);
+        sensor.AddObservation(dx / 20f);
+        sensor.AddObservation(dy / 10f);
+        sensor.AddObservation(dist / 20f);
+        sensor.AddObservation(angleToEnemy / 90f);
+        sensor.AddObservation(localTank.currentHp / localTank.maxHp);
+        sensor.AddObservation(enemyTank.currentHp / enemyTank.maxHp);
+        sensor.AddObservation((localTank.currentHp - enemyTank.currentHp) / 100f);
+        sensor.AddObservation(localTank.barrel != null ? localTank.barrel.localEulerAngles.z / 90f : 0f);
+        sensor.AddObservation(terrain != null ? terrain.GetHeightAtX(localTank.transform.position.x) / 5f : 0f);
+        sensor.AddObservation(terrain != null ? terrain.GetHeightAtX(enemyTank.transform.position.x) / 5f : 0f);
     }
 
     public override void OnActionReceived(ActionBuffers actions)
     {
-        // 📝 LOG: Decision received!
-        if (!canCaptureActions) { Debug.Log("[TankAgent] ACTION BLOCKED: Not AI's turn."); return; }
-        if (isWaitingForShot) { Debug.Log("[TankAgent] ACTION BLOCKED: Projectile in air."); return; }
+        // Speed up training 10x
+        if (!isVsAIMode) Time.timeScale = 10;
+        
+        // In training mode, always allow actions. In VsAI mode, check turn.
+        if (isVsAIMode)
+        {
+            if (!canCaptureActions) return;
+            if (isWaitingForShot) return;
+        }
+        else
+        {
+            // Training mode - block if projectile in air
+            if (isWaitingForShot) return;
+        }
 
         float angle = 45f;
         float power = 75f;
 
+        // If no trained model loaded, use heuristic
+        if (actions.ContinuousActions.Length == 0 && actions.DiscreteActions.Length == 0)
+        {
+            UseHeuristicFallback();
+            return;
+        }
+
         // Support BOTH Continuous and Discrete models
         if (actions.ContinuousActions.Length >= 2)
         {
-            angle = ((actions.ContinuousActions[0] + 1f) / 2f) * 90f;
-            power = ((actions.ContinuousActions[1] + 1f) / 2f) * 100f;
-            Debug.Log($"[TankAgent] Brain (Continuous) -> Angle: {angle:F1}, Power: {power:F1}");
+            // ML-Agents outputs [-1, 1], map to game values
+            angle = (actions.ContinuousActions[0] + 1f) / 2f * 90f;
+            power = (actions.ContinuousActions[1] + 1f) / 2f * 100f;
+            
+            angle = Mathf.Clamp(angle, 0f, 90f);
+            power = Mathf.Clamp(power, 10f, 100f);
         }
         else if (actions.DiscreteActions.Length >= 2)
         {
-            // Map [0, 90] discrete angle and [0, 100] discrete power
             angle = actions.DiscreteActions[0];
             power = actions.DiscreteActions[1];
-            Debug.Log($"[TankAgent] Brain (Discrete) -> Angle: {angle:F1}, Power: {power:F1}");
         }
         else
         {
-            Debug.LogError("[TankAgent] ERROR: Model has neither enough Continuous (2) nor Discrete (2) actions!");
+            UseHeuristicFallback();
             return;
         }
 
@@ -99,13 +135,26 @@ public class TankAgent : Agent
         if (!isVsAIMode) AddReward(-0.001f);
     }
 
+    private void UseHeuristicFallback()
+    {
+        if (localTank == null || enemyTank == null) return;
+        
+        float dx = enemyTank.transform.position.x - localTank.transform.position.x;
+        float dy = enemyTank.transform.position.y - localTank.transform.position.y;
+        float dist = Mathf.Sqrt(dx * dx + dy * dy);
+        float angleToEnemy = Mathf.Atan2(dy, Mathf.Abs(dx)) * Mathf.Rad2Deg;
+
+        float angle = Mathf.Clamp(angleToEnemy * 0.7f + 15f, 10f, 85f);
+        float power = Mathf.Clamp(dist * 5f + 40f, 30f, 95f);
+
+        FireActualShot(angle, power);
+        
+        if (!isVsAIMode) AddReward(-0.001f);
+    }
+
     public void FireActualShot(float angle, float power)
     {
-        if (projectilePrefab == null || localTank == null)
-        {
-            Debug.LogError("[TankAgent] FireActualShot: projectilePrefab or localTank is null!");
-            return;
-        }
+        if (projectilePrefab == null || localTank == null) return;
 
         isWaitingForShot = true;
 
@@ -125,7 +174,6 @@ public class TankAgent : Agent
         var pc = proj.GetComponent<ProjectileController>();
         if (pc == null)
         {
-            Debug.LogError("[TankAgent] Projectile prefab is missing ProjectileController!");
             Destroy(proj);
             isWaitingForShot = false;
             return;
@@ -137,7 +185,6 @@ public class TankAgent : Agent
 
     public override void Heuristic(in ActionBuffers actionsOut)
     {
-        // Apunta aproximadament a l'enemic amb una estimació balística simple
         var actions = actionsOut.ContinuousActions;
         if (actions.Length < 2 || localTank == null || enemyTank == null)
         {
@@ -145,13 +192,17 @@ public class TankAgent : Agent
             return;
         }
 
-        float dist = Mathf.Abs(enemyTank.transform.position.x - localTank.transform.position.x);
-        // Simple heuristic: angle ~45° scales with distance, power scales with distance
-        float normAngle = Mathf.Clamp(45f / 90f, 0f, 1f);       // ~45° → es mapeja a 0 en [-1,1]
-        float normPower = Mathf.Clamp(dist / 18f, 0.1f, 1f);    // potència basada en distància
-        // Convertir [0,1] → [-1,1] per l'espai d'accions contínues
-        actions[0] = normAngle * 2f - 1f;
-        actions[1] = normPower * 2f - 1f;
+        float dx = enemyTank.transform.position.x - localTank.transform.position.x;
+        float dy = enemyTank.transform.position.y - localTank.transform.position.y;
+        float dist = Mathf.Sqrt(dx * dx + dy * dy);
+        float angleToEnemy = Mathf.Atan2(dy, Mathf.Abs(dx)) * Mathf.Rad2Deg;
+
+        float optimalAngle = Mathf.Clamp(angleToEnemy * 0.7f + 15f, 10f, 85f);
+        float optimalPower = Mathf.Clamp(dist * 5f + 40f, 30f, 95f);
+
+        // Convert [0,90] and [0,100] to [-1,1] for ML-Agents continuous action space
+        actions[0] = (optimalAngle / 90f) * 2f - 1f;
+        actions[1] = (optimalPower / 100f) * 2f - 1f;
     }
 
     private void OnProjectileImpact(Vector2 impactWorld, bool hitTank)
@@ -191,7 +242,7 @@ public class TankAgent : Agent
             if (hitTank)
             {
                 AddReward(1.0f);
-                EndEpisode();
+                Debug.Log("[TankAgent] HIT! Ending episode");
             }
             else
             {
@@ -199,9 +250,15 @@ public class TankAgent : Agent
                     ? Vector2.Distance(impactWorld, enemyTank.transform.position)
                     : 10f;
                 AddReward(-0.01f * d);
-                if (d > 5f) EndEpisode();
+                Debug.Log($"[TankAgent] Miss - dist: {d:F1}, ending episode");
             }
             isWaitingForShot = false;
+            
+            // Force end episode immediately
+            EndEpisode();
+            
+            // Request immediate decision for next episode
+            RequestDecision();
         }
     }
 }

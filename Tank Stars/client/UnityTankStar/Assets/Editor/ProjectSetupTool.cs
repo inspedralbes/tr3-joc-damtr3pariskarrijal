@@ -384,6 +384,12 @@ public class ProjectSetupTool : EditorWindow
         tc1.terrain = tg;
         tc2.terrain = tg;
 
+        // Posicionar tancs: agent (red) a l'esquerra, target (blue) a la dreta
+        agentObj.transform.position = new Vector3(-6f, 0, 0);
+        targetObj.transform.position = new Vector3(6f, 0, 0);
+        tc1.PlaceOnTerrain();
+        tc2.PlaceOnTerrain();
+
         // 3. Configuració de l'agent
         var agent = agentObj.AddComponent<TankAgent>();
         agent.localTank = tc1;
@@ -395,7 +401,8 @@ public class ProjectSetupTool : EditorWindow
 
         var bp = agentObj.AddComponent<Unity.MLAgents.Policies.BehaviorParameters>();
         bp.BehaviorName = "TankBehavior";
-        bp.BehaviorType = Unity.MLAgents.Policies.BehaviorType.HeuristicOnly;
+        bp.BehaviorType = Unity.MLAgents.Policies.BehaviorType.Default;
+        bp.Model = null; // No pretrained model for training
 
         agentObj.AddComponent<Unity.MLAgents.DecisionRequester>().DecisionPeriod = 1;
 
